@@ -1,0 +1,1896 @@
+"use client";
+
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  RAID_DEFINITIONS,
+  buildRaidPlan,
+  getAutoRaidsForLevel,
+  getExclusiveRaidNames,
+  inferRoleFromClassName,
+  type CharacterInput,
+  type RaidGroup,
+  type RaidPlanResult,
+  type Role,
+} from "./lib/raidPlanner";
+
+type Character = {
+  id: string;
+  name: string;
+  serverName: string;
+  itemLevel: number;
+  combatPower: number;
+  className: string;
+  role: Role;
+  selectedRaids: string[];
+  raidsEdited: boolean;
+  roleEdited: boolean;
+};
+
+type Expedition = {
+  id: string;
+  name: string;
+  representativeName: string;
+  serverName: string;
+  lastSyncedAt: string;
+  charactersHidden: boolean;
+  deletedCharacterNames: string[];
+  deletedCharacters: Character[];
+  characters: Character[];
+};
+
+type Player = {
+  id: string;
+  name: string;
+  expeditions: Expedition[];
+};
+
+type RosterCharacter = {
+  name: string;
+  serverName: string;
+  className: string;
+  itemLevel: number;
+  combatPower: number;
+};
+
+type TabKey = "players" | "results";
+
+const STORAGE_KEY = "lostark-raid-builder-v3";
+const LEGACY_STORAGE_KEYS = [
+  "lostark-raid-builder-v2",
+  "lostark-raid-builder-v1",
+];
+const API_KEY_STORAGE_KEY = "lostark-openapi-jwt";
+
+const TABS: Array<{ id: TabKey; label: string }> = [
+  { id: "players", label: "멤버 목록" },
+  { id: "results", label: "자동구성 결과" },
+];
+
+const RAID_FAMILIES = [
+  { id: "serka", label: "세르카" },
+  { id: "cathedral", label: "성당" },
+  { id: "finale", label: "종막" },
+  { id: "act4", label: "4막" },
+] as const;
+
+const SUPPORT_CLASS_NAMES = ["도화가", "홀리나이트", "바드", "아티스트", "artist", "bard", "paladin"];
+
+const createId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const createCharacter = (): Character => ({
+  id: createId(),
+  name: "",
+  serverName: "",
+  itemLevel: 1710,
+  combatPower: 0,
+  className: "",
+  role: "dealer",
+  selectedRaids: getAutoRaidsForLevel(1710),
+  raidsEdited: false,
+  roleEdited: false,
+});
+
+const createExpedition = (index: number): Expedition => ({
+  id: createId(),
+  name: `원정대 ${index}`,
+  representativeName: "",
+  serverName: "",
+  lastSyncedAt: "",
+  charactersHidden: false,
+  deletedCharacterNames: [],
+  deletedCharacters: [],
+  characters: [],
+});
+
+const createPlayer = (index: number): Player => ({
+  id: createId(),
+  name: `플레이어 ${index}`,
+  expeditions: [createExpedition(1)],
+});
+
+const normalizePlayers = (value: unknown): Player[] | null => {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const players = value
+    .map((player, playerIndex) => normalizePlayer(player, playerIndex))
+    .filter((player): player is Player => Boolean(player));
+
+  return players;
+};
+
+const normalizePlayer = (value: unknown, playerIndex: number): Player | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const source = value as Partial<
+    Player & {
+      representativeName: string;
+      serverName: string;
+      lastSyncedAt: string;
+      characters: Character[];
+    }
+  >;
+  const expeditions = Array.isArray(source.expeditions)
+    ? source.expeditions
+        .map((expedition, expeditionIndex) =>
+          normalizeExpedition(expedition, expeditionIndex),
+        )
+        .filter((expedition): expedition is Expedition => Boolean(expedition))
+    : [
+        normalizeExpedition(
+          {
+            id: source.id,
+            name: "원정대 1",
+            representativeName: source.representativeName,
+            serverName: source.serverName,
+            lastSyncedAt: source.lastSyncedAt,
+            characters: source.characters,
+          },
+          0,
+        ),
+      ].filter((expedition): expedition is Expedition => Boolean(expedition));
+
+  return {
+    id: typeof source.id === "string" ? source.id : createId(),
+    name:
+      typeof source.name === "string" && source.name.trim()
+        ? source.name
+        : `플레이어 ${playerIndex + 1}`,
+    expeditions: expeditions.length ? expeditions : [createExpedition(1)],
+  };
+};
+
+const normalizeExpedition = (
+  value: unknown,
+  expeditionIndex: number,
+): Expedition | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const source = value as Partial<Expedition>;
+  const characters = Array.isArray(source.characters)
+    ? source.characters
+        .map(normalizeCharacter)
+        .filter((character): character is Character => Boolean(character))
+    : [];
+  const deletedCharacterNames = Array.isArray(source.deletedCharacterNames)
+    ? source.deletedCharacterNames.filter(
+        (name): name is string => typeof name === "string" && Boolean(name.trim()),
+      )
+    : [];
+  const deletedCharacters = Array.isArray(source.deletedCharacters)
+    ? source.deletedCharacters
+        .map(normalizeCharacter)
+        .filter((character): character is Character => Boolean(character))
+    : [];
+
+  return {
+    id: typeof source.id === "string" ? source.id : createId(),
+    name:
+      typeof source.name === "string" && source.name.trim()
+        ? source.name
+        : `원정대 ${expeditionIndex + 1}`,
+    representativeName:
+      typeof source.representativeName === "string"
+        ? source.representativeName
+        : "",
+    serverName:
+      typeof source.serverName === "string" ? source.serverName : "",
+    lastSyncedAt:
+      typeof source.lastSyncedAt === "string" ? source.lastSyncedAt : "",
+    charactersHidden: Boolean(source.charactersHidden),
+    deletedCharacterNames,
+    deletedCharacters,
+    characters,
+  };
+};
+
+const normalizeCharacter = (value: unknown): Character | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const source = value as Partial<Character>;
+  const itemLevel = Number(source.itemLevel) || 0;
+  const selectedRaids = Array.isArray(source.selectedRaids)
+    ? makeExclusiveRaids(
+        source.selectedRaids.filter((raid): raid is string => typeof raid === "string"),
+      )
+    : getAutoRaidsForLevel(itemLevel);
+
+  return {
+    id: typeof source.id === "string" ? source.id : createId(),
+    name: typeof source.name === "string" ? source.name : "",
+    serverName: typeof source.serverName === "string" ? source.serverName : "",
+    itemLevel,
+    combatPower: Number(source.combatPower) || 0,
+    className: typeof source.className === "string" ? source.className : "",
+    role: source.role === "support" ? "support" : "dealer",
+    selectedRaids,
+    raidsEdited: Boolean(source.raidsEdited),
+    roleEdited: Boolean(source.roleEdited),
+  };
+};
+
+export default function Home() {
+  const [players, setPlayers] = useState<Player[]>([createPlayer(1)]);
+  const [apiKey, setApiKey] = useState("");
+  const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>("players");
+  const [hydrated, setHydrated] = useState(false);
+  const [generatedPlan, setGeneratedPlan] = useState<RaidPlanResult | null>(null);
+  const [generatedFingerprint, setGeneratedFingerprint] = useState("");
+  const [notice, setNotice] = useState("");
+  const [syncingId, setSyncingId] = useState("");
+  const [expandedCharacters, setExpandedCharacters] = useState<Set<string>>(new Set());
+  const [pendingScrollPlayerId, setPendingScrollPlayerId] = useState("");
+
+  const fingerprint = useMemo(() => JSON.stringify(players), [players]);
+  const isPlanStale = Boolean(generatedPlan) && generatedFingerprint !== fingerprint;
+
+  const characterInputs = useMemo<CharacterInput[]>(
+    () =>
+      players.flatMap((player) =>
+        player.expeditions.flatMap((expedition) =>
+          expedition.characters.map((character) => ({
+            id: character.id,
+            playerId: player.id,
+            playerName: player.name.trim(),
+            characterName: character.name.trim(),
+            itemLevel: character.itemLevel,
+            className: character.className.trim(),
+            role: character.role,
+            selectedRaids: character.selectedRaids,
+          })),
+        ),
+      ),
+    [players],
+  );
+
+  const selectedRaidCount = useMemo(
+    () =>
+      characterInputs.reduce(
+        (count, character) => count + new Set(character.selectedRaids).size,
+        0,
+      ),
+    [characterInputs],
+  );
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const stored =
+        window.localStorage.getItem(STORAGE_KEY) ??
+        LEGACY_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(Boolean);
+      const storedApiKey = window.localStorage.getItem(API_KEY_STORAGE_KEY);
+
+      if (storedApiKey) {
+        setApiKey(storedApiKey);
+      }
+
+      if (stored) {
+        try {
+          const normalized = normalizePlayers(JSON.parse(stored));
+          if (normalized) {
+            setPlayers(normalized.length ? normalized : [createPlayer(1)]);
+          }
+        } catch {
+          setNotice("저장된 데이터를 읽지 못했습니다.");
+        }
+      }
+
+      setHydrated(true);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  useEffect(() => {
+    if (hydrated) {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(players));
+    }
+  }, [hydrated, players]);
+
+  useEffect(() => {
+    if (hydrated) {
+      window.localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
+    }
+  }, [apiKey, hydrated]);
+
+  useEffect(() => {
+    if (!pendingScrollPlayerId) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`player-${pendingScrollPlayerId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "end" });
+      setPendingScrollPlayerId("");
+    });
+  }, [pendingScrollPlayerId]);
+
+  const updatePlayer = (playerId: string, patch: Partial<Player>) => {
+    setPlayers((current) =>
+      current.map((player) =>
+        player.id === playerId ? { ...player, ...patch } : player,
+      ),
+    );
+  };
+
+  const updateExpedition = (
+    playerId: string,
+    expeditionId: string,
+    patch: Partial<Expedition>,
+  ) => {
+    setPlayers((current) =>
+      current.map((player) =>
+        player.id === playerId
+          ? {
+              ...player,
+              expeditions: player.expeditions.map((expedition) =>
+                expedition.id === expeditionId
+                  ? { ...expedition, ...patch }
+                  : expedition,
+              ),
+            }
+          : player,
+      ),
+    );
+  };
+
+  const updateCharacter = (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    updater: (character: Character) => Character,
+  ) => {
+    setPlayers((current) =>
+      current.map((player) =>
+        player.id === playerId
+          ? {
+              ...player,
+              expeditions: player.expeditions.map((expedition) =>
+                expedition.id === expeditionId
+                  ? {
+                      ...expedition,
+                      characters: expedition.characters.map((character) =>
+                        character.id === characterId ? updater(character) : character,
+                      ),
+                    }
+                  : expedition,
+              ),
+            }
+          : player,
+      ),
+    );
+  };
+
+  const addPlayer = () => {
+    const nextPlayer = createPlayer(players.length + 1);
+    setPlayers((current) => [...current, nextPlayer]);
+    setPendingScrollPlayerId(nextPlayer.id);
+  };
+
+  const removePlayer = (playerId: string) => {
+    setPlayers((current) => current.filter((player) => player.id !== playerId));
+  };
+
+  const addExpedition = (playerId: string) => {
+    setPlayers((current) =>
+      current.map((player) =>
+        player.id === playerId
+          ? {
+              ...player,
+              expeditions: [
+                ...player.expeditions,
+                createExpedition(player.expeditions.length + 1),
+              ],
+            }
+          : player,
+      ),
+    );
+  };
+
+  const removeExpedition = (playerId: string, expeditionId: string) => {
+    setPlayers((current) =>
+      current.map((player) =>
+        player.id === playerId
+          ? {
+              ...player,
+              expeditions: player.expeditions.filter(
+                (expedition) => expedition.id !== expeditionId,
+              ),
+            }
+          : player,
+      ),
+    );
+  };
+
+  const restoreCharacter = (
+    playerId: string,
+    expeditionId: string,
+    characterName: string,
+  ) => {
+    setPlayers((current) =>
+      current.map((player) =>
+        player.id === playerId
+          ? {
+              ...player,
+              expeditions: player.expeditions.map((expedition) =>
+                expedition.id === expeditionId
+                  ? (() => {
+                      const trimmedName = characterName.trim();
+                      const restoredCharacter =
+                        expedition.deletedCharacters.find(
+                          (character) => character.name.trim() === trimmedName,
+                        ) ?? { ...createCharacter(), name: trimmedName };
+
+                      return {
+                        ...expedition,
+                        deletedCharacterNames: expedition.deletedCharacterNames.filter(
+                          (name) => name.trim() !== trimmedName,
+                        ),
+                        deletedCharacters: expedition.deletedCharacters.filter(
+                          (character) => character.name.trim() !== trimmedName,
+                        ),
+                        characters: [...expedition.characters, restoredCharacter],
+                      };
+                    })()
+                  : expedition,
+              ),
+            }
+          : player,
+      ),
+    );
+  };
+
+  const removeCharacter = (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+  ) => {
+    setPlayers((current) =>
+      current.map((player) =>
+        player.id === playerId
+          ? {
+              ...player,
+              expeditions: player.expeditions.map((expedition) =>
+                expedition.id === expeditionId
+                  ? (() => {
+                      const removedCharacter = expedition.characters.find(
+                        (character) => character.id === characterId,
+                      );
+                      const removedName = removedCharacter?.name.trim();
+                      return {
+                        ...expedition,
+                        deletedCharacterNames: removedName
+                          ? Array.from(
+                              new Set([
+                                ...expedition.deletedCharacterNames,
+                                removedName,
+                              ]),
+                            )
+                          : expedition.deletedCharacterNames,
+                        deletedCharacters:
+                          removedCharacter && removedName
+                            ? [
+                                ...expedition.deletedCharacters.filter(
+                                  (character) =>
+                                    character.name.trim() !== removedName,
+                                ),
+                                removedCharacter,
+                              ]
+                            : expedition.deletedCharacters,
+                        characters: expedition.characters.filter(
+                          (character) => character.id !== characterId,
+                        ),
+                      };
+                    })()
+                  : expedition,
+              ),
+            }
+          : player,
+      ),
+    );
+  };
+
+  const setCharacterRole = (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    role: Role,
+  ) => {
+    updateCharacter(playerId, expeditionId, characterId, (character) => ({
+      ...character,
+      role,
+      roleEdited: true,
+    }));
+  };
+
+  const toggleRaid = (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    checked: boolean,
+  ) => {
+    updateCharacter(playerId, expeditionId, characterId, (character) => {
+      const blockedRaids = getExclusiveRaidNames(raidName);
+      const nextRaids = checked
+        ? [...character.selectedRaids.filter((raid) => !blockedRaids.includes(raid) && raid !== raidName), raidName]
+        : character.selectedRaids.filter((raid) => raid !== raidName);
+
+      return {
+        ...character,
+        selectedRaids: makeExclusiveRaids(nextRaids),
+        raidsEdited: true,
+      };
+    });
+  };
+
+  const resetAllRaids = () => {
+    setPlayers((current) =>
+      current.map((player) => ({
+        ...player,
+        expeditions: player.expeditions.map((expedition) => ({
+          ...expedition,
+          characters: expedition.characters.map((character) => ({
+            ...character,
+            selectedRaids: getAutoRaidsForLevel(character.itemLevel),
+            raidsEdited: false,
+          })),
+        })),
+      })),
+    );
+    setNotice("아이템 레벨 기준으로 레이드를 다시 자동 등록했습니다.");
+  };
+
+  const generatePlan = () => {
+    const plan = buildRaidPlan(characterInputs);
+    setGeneratedPlan(plan);
+    setGeneratedFingerprint(fingerprint);
+    setActiveTab("results");
+    setNotice("공격대 구성이 생성되었습니다.");
+  };
+
+  const fetchRoster = async (representativeName: string) => {
+    const response = await fetch("/api/lostark/roster", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ apiKey, characterName: representativeName }),
+    });
+    const payload = (await response.json()) as {
+      characters?: RosterCharacter[];
+      message?: string;
+    };
+
+    if (!response.ok) {
+      throw new Error(payload.message ?? "원정대 정보를 가져오지 못했습니다.");
+    }
+
+    return payload.characters ?? [];
+  };
+
+  const syncRoster = async (playerId: string, expeditionId: string) => {
+    const player = players.find((candidate) => candidate.id === playerId);
+    const expedition = player?.expeditions.find(
+      (candidate) => candidate.id === expeditionId,
+    );
+
+    if (!player || !expedition) {
+      return;
+    }
+
+    if (!apiKey.trim()) {
+      setNotice("Lost Ark OpenAPI JWT를 입력하세요.");
+      return;
+    }
+
+    if (!expedition.representativeName.trim()) {
+      setNotice("대표 캐릭터명을 입력하세요.");
+      return;
+    }
+
+    const syncId = `${playerId}:${expeditionId}`;
+    setSyncingId(syncId);
+    setNotice("");
+
+    try {
+      const roster = await fetchRoster(expedition.representativeName);
+      setPlayers((current) =>
+        current.map((candidate) =>
+          candidate.id === playerId
+            ? {
+                ...candidate,
+                expeditions: candidate.expeditions.map((currentExpedition) =>
+                  currentExpedition.id === expeditionId
+                    ? mergeRosterIntoExpedition(currentExpedition, roster)
+                    : currentExpedition,
+                ),
+              }
+            : candidate,
+        ),
+      );
+      setGeneratedPlan(null);
+      setGeneratedFingerprint("");
+      setNotice(`${expedition.name}: 캐릭터 ${roster.length}명을 동기화했습니다.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "동기화에 실패했습니다.");
+    } finally {
+      setSyncingId("");
+    }
+  };
+
+  const syncAllRosters = async () => {
+    if (!apiKey.trim()) {
+      setNotice("Lost Ark OpenAPI JWT를 입력하세요.");
+      return;
+    }
+
+    let syncedCount = 0;
+    setNotice("전체 정보를 동기화하는 중입니다.");
+
+    for (const player of players) {
+      for (const expedition of player.expeditions) {
+        if (!expedition.representativeName.trim()) {
+          continue;
+        }
+
+        try {
+          setSyncingId(`${player.id}:${expedition.id}`);
+          const roster = await fetchRoster(expedition.representativeName);
+          setPlayers((current) =>
+            current.map((candidate) =>
+              candidate.id === player.id
+                ? {
+                    ...candidate,
+                    expeditions: candidate.expeditions.map((currentExpedition) =>
+                      currentExpedition.id === expedition.id
+                        ? mergeRosterIntoExpedition(currentExpedition, roster)
+                        : currentExpedition,
+                    ),
+                  }
+                : candidate,
+            ),
+          );
+          syncedCount += 1;
+        } catch {
+          // Keep syncing the remaining rosters.
+        }
+      }
+    }
+
+    setSyncingId("");
+    setGeneratedPlan(null);
+    setGeneratedFingerprint("");
+    setNotice(`원정대 ${syncedCount}개를 동기화했습니다.`);
+  };
+
+  const totalGroups = generatedPlan
+    ? Object.values(generatedPlan.groupsByRaid).reduce(
+        (count, groups) => count + groups.length,
+        0,
+      )
+    : 0;
+
+  return (
+    <main className="min-h-screen bg-[#f7f8fb] text-[#151923]">
+      <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-5">
+        <header className="app-header">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-[#5b6d86]">Lost Ark Raid Builder</p>
+            <h1 className="text-2xl font-bold leading-8">
+              로스트아크 공격대 자동구성
+            </h1>
+            <div className="metric-row">
+              <span>플레이어 {players.length}</span>
+              <span>원정대 {players.reduce((count, player) => count + player.expeditions.length, 0)}</span>
+              <span>캐릭터 {characterInputs.length}</span>
+              <span>선택 레이드 {selectedRaidCount}</span>
+              <span>생성 공대 {totalGroups}</span>
+            </div>
+          </div>
+
+          <div className="header-actions">
+            <button
+              className="gear-button"
+              type="button"
+              aria-label="API 설정"
+              onClick={() => setApiSettingsOpen(true)}
+            >
+              <span aria-hidden="true">⚙</span>
+            </button>
+          </div>
+        </header>
+
+        {apiSettingsOpen ? (
+          <ApiSettingsModal
+            apiKey={apiKey}
+            onChangeApiKey={setApiKey}
+            onClose={() => setApiSettingsOpen(false)}
+          />
+        ) : null}
+
+        <nav className="tab-strip" aria-label="작업 탭">
+          {TABS.map((tab) => (
+            <button
+              className={activeTab === tab.id ? "active" : ""}
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+          <button className="generate-tab-button" type="button" onClick={generatePlan}>
+            레이드 자동구성
+          </button>
+        </nav>
+
+        {notice ? <div className="notice-bar">{notice}</div> : null}
+
+        {activeTab === "players" ? (
+          <PlayerEditor
+            players={players}
+            syncingId={syncingId}
+            expandedCharacters={expandedCharacters}
+            onAddPlayer={addPlayer}
+            onRemovePlayer={removePlayer}
+            onUpdatePlayer={updatePlayer}
+            onAddExpedition={addExpedition}
+            onRemoveExpedition={removeExpedition}
+            onUpdateExpedition={updateExpedition}
+            onSyncRoster={syncRoster}
+            onSyncAll={syncAllRosters}
+            onResetAllRaids={resetAllRaids}
+            onRestoreCharacter={restoreCharacter}
+            onRemoveCharacter={removeCharacter}
+            onSetRole={setCharacterRole}
+            onToggleRaid={toggleRaid}
+            onToggleCharacter={(characterId) =>
+              setExpandedCharacters((current) => {
+                const next = new Set(current);
+                if (next.has(characterId)) {
+                  next.delete(characterId);
+                } else {
+                  next.add(characterId);
+                }
+                return next;
+              })
+            }
+          />
+        ) : (
+          <ResultPanel
+            plan={generatedPlan}
+            players={players}
+            stale={isPlanStale}
+            onGenerate={generatePlan}
+          />
+        )}
+      </div>
+    </main>
+  );
+}
+
+function ApiSettingsModal({
+  apiKey,
+  onChangeApiKey,
+  onClose,
+}: {
+  apiKey: string;
+  onChangeApiKey: (apiKey: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="settings-modal-backdrop">
+      <section
+        className="settings-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="api-settings-title"
+      >
+        <div className="settings-modal-head">
+          <div>
+            <h2 id="api-settings-title">API 설정</h2>
+            <p>Lost Ark OpenAPI JWT</p>
+          </div>
+          <button
+            className="settings-close-button"
+            type="button"
+            aria-label="API 설정 닫기"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+
+        <label className="settings-field">
+          <span>API 키</span>
+          <input
+            className="settings-input"
+            type="password"
+            value={apiKey}
+            placeholder="Lost Ark OpenAPI JWT"
+            onChange={(event) => onChangeApiKey(event.target.value)}
+          />
+        </label>
+
+        <div className="settings-modal-actions">
+          <button className="dark-button" type="button" onClick={onClose}>
+            완료
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function mergeRosterIntoExpedition(
+  expedition: Expedition,
+  roster: RosterCharacter[],
+): Expedition {
+  const deletedNames = new Set(
+    [
+      ...expedition.deletedCharacterNames,
+      ...expedition.deletedCharacters.map((character) => character.name),
+    ]
+      .map((name) => name.trim())
+      .filter(Boolean),
+  );
+  const visibleRoster = roster.filter(
+    (rosterCharacter) => !deletedNames.has(rosterCharacter.name.trim()),
+  );
+  const previousByName = new Map(
+    expedition.characters.map((character) => [character.name, character]),
+  );
+  const characters = visibleRoster.map((rosterCharacter) => {
+    const previous = previousByName.get(rosterCharacter.name);
+    const inferredRole = inferRoleFromClassName(rosterCharacter.className) ?? "dealer";
+
+    return {
+      id: previous?.id ?? createId(),
+      name: rosterCharacter.name,
+      serverName: rosterCharacter.serverName,
+      itemLevel: rosterCharacter.itemLevel,
+      combatPower: rosterCharacter.combatPower,
+      className: rosterCharacter.className,
+      role: previous?.roleEdited ? previous.role : inferredRole,
+      selectedRaids: previous?.raidsEdited
+        ? previous.selectedRaids
+        : getAutoRaidsForLevel(rosterCharacter.itemLevel),
+      raidsEdited: previous?.raidsEdited ?? false,
+      roleEdited: previous?.roleEdited ?? false,
+    } satisfies Character;
+  });
+
+  return {
+    ...expedition,
+    serverName: roster[0]?.serverName ?? expedition.serverName,
+    lastSyncedAt: new Date().toISOString(),
+    characters,
+  };
+}
+
+function PlayerEditor({
+  players,
+  syncingId,
+  expandedCharacters,
+  onAddPlayer,
+  onRemovePlayer,
+  onUpdatePlayer,
+  onAddExpedition,
+  onRemoveExpedition,
+  onUpdateExpedition,
+  onSyncRoster,
+  onSyncAll,
+  onResetAllRaids,
+  onRestoreCharacter,
+  onRemoveCharacter,
+  onSetRole,
+  onToggleRaid,
+  onToggleCharacter,
+}: {
+  players: Player[];
+  syncingId: string;
+  expandedCharacters: Set<string>;
+  onAddPlayer: () => void;
+  onRemovePlayer: (playerId: string) => void;
+  onUpdatePlayer: (playerId: string, patch: Partial<Player>) => void;
+  onAddExpedition: (playerId: string) => void;
+  onRemoveExpedition: (playerId: string, expeditionId: string) => void;
+  onUpdateExpedition: (
+    playerId: string,
+    expeditionId: string,
+    patch: Partial<Expedition>,
+  ) => void;
+  onSyncRoster: (playerId: string, expeditionId: string) => void;
+  onSyncAll: () => void;
+  onResetAllRaids: () => void;
+  onRestoreCharacter: (
+    playerId: string,
+    expeditionId: string,
+    characterName: string,
+  ) => void;
+  onRemoveCharacter: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+  ) => void;
+  onSetRole: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    role: Role,
+  ) => void;
+  onToggleRaid: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    checked: boolean,
+  ) => void;
+  onToggleCharacter: (characterId: string) => void;
+}) {
+  const [editingPlayers, setEditingPlayers] = useState<Set<string>>(new Set());
+  const [editingExpeditions, setEditingExpeditions] = useState<Set<string>>(
+    new Set(),
+  );
+  const [collapsedPlayers, setCollapsedPlayers] = useState<Set<string>>(new Set());
+  const [settingsTarget, setSettingsTarget] = useState<{
+    playerId: string;
+    expeditionId: string;
+  } | null>(null);
+
+  const startEditingPlayer = (playerId: string) => {
+    setEditingPlayers((current) => new Set(current).add(playerId));
+  };
+
+  const stopEditingPlayer = (playerId: string) => {
+    setEditingPlayers((current) => {
+      const next = new Set(current);
+      next.delete(playerId);
+      return next;
+    });
+  };
+
+  const startEditingExpedition = (expeditionId: string) => {
+    setEditingExpeditions((current) => new Set(current).add(expeditionId));
+  };
+
+  const stopEditingExpedition = (expeditionId: string) => {
+    setEditingExpeditions((current) => {
+      const next = new Set(current);
+      next.delete(expeditionId);
+      return next;
+    });
+  };
+
+  const toggleCollapsedPlayer = (playerId: string) => {
+    setCollapsedPlayers((current) => {
+      const next = new Set(current);
+      if (next.has(playerId)) {
+        next.delete(playerId);
+      } else {
+        next.add(playerId);
+      }
+      return next;
+    });
+  };
+
+  const settingsPlayer = settingsTarget
+    ? players.find((player) => player.id === settingsTarget.playerId)
+    : undefined;
+  const settingsExpedition = settingsPlayer
+    ? settingsPlayer.expeditions.find(
+        (expedition) => expedition.id === settingsTarget?.expeditionId,
+      )
+    : undefined;
+
+  return (
+    <section className="member-shell">
+      <div className="member-heading">
+        <div className="member-title">멤버 목록</div>
+        <button className="dark-button" type="button" onClick={onAddPlayer}>
+          + 플레이어 추가
+        </button>
+      </div>
+
+      <div className="player-stack">
+        {players.map((player) => {
+          const playerCollapsed = collapsedPlayers.has(player.id);
+
+          return (
+            <article className="player-card" id={`player-${player.id}`} key={player.id}>
+              <div className="player-card-head">
+                <div className="player-name-line">
+                  <span className="user-circle-icon" aria-hidden="true" />
+                  {editingPlayers.has(player.id) ? (
+                    <input
+                      aria-label="플레이어명"
+                      autoFocus
+                      className="plain-title-input"
+                      value={player.name}
+                      onBlur={() => stopEditingPlayer(player.id)}
+                      onChange={(event) =>
+                        onUpdatePlayer(player.id, { name: event.target.value })
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === "Escape") {
+                          event.currentTarget.blur();
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span className="plain-title-text">{player.name}</span>
+                  )}
+                  <button
+                    className="icon-button edit-icon-button"
+                    type="button"
+                    aria-label="플레이어명 수정"
+                    onClick={() => startEditingPlayer(player.id)}
+                  >
+                    ✎
+                  </button>
+                </div>
+                <div className="player-head-right">
+                  <button
+                    className="collapse-button"
+                    type="button"
+                    aria-expanded={!playerCollapsed}
+                    onClick={() => toggleCollapsedPlayer(player.id)}
+                  >
+                    <span>캐릭터</span>
+                    <span
+                      className={`fold-icon inline ${playerCollapsed ? "" : "expanded"}`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </div>
+              </div>
+
+              <div
+                className={`player-collapsible ${playerCollapsed ? "collapsed" : "expanded"}`}
+                aria-hidden={playerCollapsed}
+              >
+                  <div className="player-command-row">
+                    <button className="ghost-button" type="button" onClick={onSyncAll}>
+                      ↻ 전체 정보 업데이트
+                    </button>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={onResetAllRaids}
+                    >
+                      ✨ 레이드 자동 등록
+                    </button>
+                    <button
+                      className="dark-button"
+                      type="button"
+                      onClick={() => onAddExpedition(player.id)}
+                    >
+                      + 원정대 추가
+                    </button>
+                    <button
+                      className="danger-text-button"
+                      type="button"
+                      onClick={() => onRemovePlayer(player.id)}
+                      disabled={players.length === 1}
+                    >
+                      삭제
+                    </button>
+                  </div>
+
+                  <div className="expedition-stack">
+                    {player.expeditions.map((expedition) => (
+                      <ExpeditionBlock
+                        expedition={expedition}
+                        expandedCharacters={expandedCharacters}
+                        isSyncing={syncingId === `${player.id}:${expedition.id}`}
+                        key={expedition.id}
+                        player={player}
+                        onRestoreCharacter={onRestoreCharacter}
+                        onRemoveCharacter={onRemoveCharacter}
+                        onRemoveExpedition={onRemoveExpedition}
+                        onSetRole={onSetRole}
+                        onSyncRoster={onSyncRoster}
+                        onToggleCharacter={onToggleCharacter}
+                        onToggleRaid={onToggleRaid}
+                        onUpdateExpedition={onUpdateExpedition}
+                        onOpenSettings={() =>
+                          setSettingsTarget({
+                            playerId: player.id,
+                            expeditionId: expedition.id,
+                          })
+                        }
+                        isEditingName={editingExpeditions.has(expedition.id)}
+                        onStartEditName={() => startEditingExpedition(expedition.id)}
+                        onStopEditName={() => stopEditingExpedition(expedition.id)}
+                      />
+                    ))}
+                  </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+
+      <div className="member-bottom-actions">
+        <button className="dark-button" type="button" onClick={onAddPlayer}>
+          + 플레이어 추가
+        </button>
+      </div>
+
+      {settingsPlayer && settingsExpedition ? (
+        <ExpeditionSettingsModal
+          expedition={settingsExpedition}
+          player={settingsPlayer}
+          onClose={() => setSettingsTarget(null)}
+          onSyncRoster={onSyncRoster}
+          onUpdateExpedition={onUpdateExpedition}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function ExpeditionBlock({
+  player,
+  expedition,
+  expandedCharacters,
+  isEditingName,
+  isSyncing,
+  onRestoreCharacter,
+  onRemoveCharacter,
+  onRemoveExpedition,
+  onSetRole,
+  onOpenSettings,
+  onStartEditName,
+  onStopEditName,
+  onSyncRoster,
+  onToggleCharacter,
+  onToggleRaid,
+  onUpdateExpedition,
+}: {
+  player: Player;
+  expedition: Expedition;
+  expandedCharacters: Set<string>;
+  isEditingName: boolean;
+  isSyncing: boolean;
+  onRestoreCharacter: (
+    playerId: string,
+    expeditionId: string,
+    characterName: string,
+  ) => void;
+  onRemoveCharacter: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+  ) => void;
+  onRemoveExpedition: (playerId: string, expeditionId: string) => void;
+  onSetRole: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    role: Role,
+  ) => void;
+  onOpenSettings: () => void;
+  onStartEditName: () => void;
+  onStopEditName: () => void;
+  onSyncRoster: (playerId: string, expeditionId: string) => void;
+  onToggleCharacter: (characterId: string) => void;
+  onToggleRaid: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    checked: boolean,
+  ) => void;
+  onUpdateExpedition: (
+    playerId: string,
+    expeditionId: string,
+    patch: Partial<Expedition>,
+  ) => void;
+}) {
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const restorableCharacters = getRestorableCharacters(expedition);
+
+  return (
+    <section className="expedition-block">
+      <div className="expedition-head">
+        <div>
+          <div className="expedition-title-line">
+            {isEditingName ? (
+              <input
+                aria-label="원정대 별칭"
+                autoFocus
+                className="expedition-name-input"
+                value={expedition.name}
+                onBlur={onStopEditName}
+                onChange={(event) =>
+                  onUpdateExpedition(player.id, expedition.id, {
+                    name: event.target.value,
+                  })
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === "Escape") {
+                    event.currentTarget.blur();
+                  }
+                }}
+              />
+            ) : (
+              <span className="expedition-name-text">{expedition.name}</span>
+            )}
+            <button
+              className="icon-button edit-icon-button"
+              type="button"
+              aria-label="원정대 별칭 수정"
+              onClick={onStartEditName}
+            >
+              ✎
+            </button>
+          </div>
+          <div className="expedition-meta">
+            <span>{expedition.serverName || "서버 미지정"}</span>
+            <span>대표 {expedition.representativeName || "대표 캐릭터 없음"}</span>
+            <span>· 캐릭터 {expedition.characters.length}명</span>
+            {expedition.lastSyncedAt ? (
+              <span>· 마지막 동기화 {formatDateTime(expedition.lastSyncedAt)}</span>
+            ) : null}
+          </div>
+        </div>
+        <div className="expedition-actions">
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => onSyncRoster(player.id, expedition.id)}
+            disabled={isSyncing}
+          >
+            ↻ {isSyncing ? "동기화 중" : "동기화"}
+          </button>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={onOpenSettings}
+          >
+            ⚙ 원정대 설정
+          </button>
+          <button
+            className="danger-text-button"
+            type="button"
+            onClick={() => onRemoveExpedition(player.id, expedition.id)}
+          >
+            🗑 삭제
+          </button>
+        </div>
+      </div>
+
+      <div
+        className={`expedition-collapsible ${expedition.charactersHidden ? "collapsed" : "expanded"}`}
+        aria-hidden={expedition.charactersHidden}
+      >
+        <div className="character-row-stack">
+          {expedition.characters.map((character) => (
+            <CharacterRow
+              character={character}
+              expanded={expandedCharacters.has(character.id)}
+              expedition={expedition}
+              key={character.id}
+              player={player}
+              onRemoveCharacter={onRemoveCharacter}
+              onSetRole={onSetRole}
+              onToggleCharacter={onToggleCharacter}
+              onToggleRaid={onToggleRaid}
+            />
+          ))}
+          <div className="restore-character-control">
+            <button
+              className="add-raid-button"
+              type="button"
+              onClick={() => setRestoreOpen((current) => !current)}
+              disabled={!restorableCharacters.length}
+            >
+              + 캐릭터 추가
+            </button>
+            {restoreOpen ? (
+              <div className="restore-character-menu">
+                {restorableCharacters.map((character) => (
+                  <button
+                    key={character.name}
+                    type="button"
+                    onClick={() => {
+                      onRestoreCharacter(player.id, expedition.id, character.name);
+                      setRestoreOpen(false);
+                    }}
+                  >
+                    <strong>{character.name}</strong>
+                    {character.className ? <span>{character.className}</span> : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ExpeditionSettingsModal({
+  player,
+  expedition,
+  onClose,
+  onSyncRoster,
+  onUpdateExpedition,
+}: {
+  player: Player;
+  expedition: Expedition;
+  onClose: () => void;
+  onSyncRoster: (playerId: string, expeditionId: string) => void;
+  onUpdateExpedition: (
+    playerId: string,
+    expeditionId: string,
+    patch: Partial<Expedition>,
+  ) => void;
+}) {
+  return (
+    <div className="settings-modal-backdrop">
+      <section
+        className="settings-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="expedition-settings-title"
+      >
+        <div className="settings-modal-head">
+          <div>
+            <h2 id="expedition-settings-title">원정대 설정</h2>
+            <p>{expedition.name}</p>
+          </div>
+          <button
+            className="settings-close-button"
+            type="button"
+            aria-label="설정 닫기"
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </div>
+
+        <label className="settings-field">
+          <span>대표 캐릭터</span>
+          <input
+            className="settings-input"
+            value={expedition.representativeName}
+            placeholder="대표 캐릭터명 입력"
+            onChange={(event) =>
+              onUpdateExpedition(player.id, expedition.id, {
+                representativeName: event.target.value,
+              })
+            }
+          />
+        </label>
+
+        <div className="settings-toggle-row">
+          <div>
+            <strong>원정대 숨김</strong>
+            <span>
+              {expedition.charactersHidden
+                ? "캐릭터 목록을 숨기는 중"
+                : "캐릭터 목록을 표시하는 중"}
+            </span>
+          </div>
+          <button
+            className={`settings-switch ${expedition.charactersHidden ? "on" : ""}`}
+            type="button"
+            aria-pressed={expedition.charactersHidden}
+            onClick={() =>
+              onUpdateExpedition(player.id, expedition.id, {
+                charactersHidden: !expedition.charactersHidden,
+              })
+            }
+          >
+            <span />
+          </button>
+        </div>
+
+        <div className="settings-modal-actions">
+          <button
+            className="dark-button"
+            type="button"
+            onClick={() => {
+              onClose();
+              onSyncRoster(player.id, expedition.id);
+            }}
+          >
+            완료
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function CharacterRow({
+  player,
+  expedition,
+  character,
+  expanded,
+  onRemoveCharacter,
+  onSetRole,
+  onToggleCharacter,
+  onToggleRaid,
+}: {
+  player: Player;
+  expedition: Expedition;
+  character: Character;
+  expanded: boolean;
+  onRemoveCharacter: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+  ) => void;
+  onSetRole: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    role: Role,
+  ) => void;
+  onToggleCharacter: (characterId: string) => void;
+  onToggleRaid: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    checked: boolean,
+  ) => void;
+}) {
+  const supportCapable = isSupportClass(character.className);
+
+  return (
+    <div className="character-row-card">
+      <div
+        className="character-row-summary"
+        role="button"
+        tabIndex={0}
+        onClick={() => onToggleCharacter(character.id)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onToggleCharacter(character.id);
+          }
+        }}
+      >
+        <span
+          className={`role-icon ${character.role === "support" ? "shield" : "sword"}`}
+          aria-hidden="true"
+        />
+        <div className="character-title-cell">
+          <span className="character-name-text">{character.name || "캐릭터명"}</span>
+        </div>
+        <span className="class-pill-text">{character.className || "직업 없음"}</span>
+        {supportCapable ? (
+          <span className="role-toggle-group">
+            <button
+              className={character.role === "support" ? "active support-option" : "support-option"}
+              type="button"
+              onKeyDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSetRole(player.id, expedition.id, character.id, "support");
+              }}
+            >
+              서폿
+            </button>
+            <button
+              className={character.role === "dealer" ? "active dealer-option" : "dealer-option"}
+              type="button"
+              onKeyDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSetRole(player.id, expedition.id, character.id, "dealer");
+              }}
+            >
+              딜러
+            </button>
+          </span>
+        ) : (
+          <span className="role-toggle-placeholder" aria-hidden="true" />
+        )}
+        <div className="character-metrics">
+          <span className="level-inline">레벨 {formatItemLevel(character.itemLevel)}</span>
+          <span
+            className={
+              character.role === "support" ? "power-text support" : "power-text dealer"
+            }
+          >
+            전투력 {character.combatPower.toLocaleString("ko-KR")}
+          </span>
+        </div>
+        <button
+          className="inline-remove-button"
+          type="button"
+          aria-label={`${character.name || "캐릭터"} 삭제`}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemoveCharacter(player.id, expedition.id, character.id);
+          }}
+        >
+          ×
+        </button>
+        <button
+          className="fold-button"
+          type="button"
+          aria-label={expanded ? "캐릭터 접기" : "캐릭터 펼치기"}
+          onKeyDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleCharacter(character.id);
+          }}
+        >
+          <span className={`fold-icon ${expanded ? "expanded" : ""}`} aria-hidden="true" />
+        </button>
+      </div>
+
+      <div
+        className={`character-detail-panel ${expanded ? "expanded" : "collapsed"}`}
+        aria-hidden={!expanded}
+      >
+        <RaidFamilySelector
+          character={character}
+          expedition={expedition}
+          player={player}
+          onToggleRaid={onToggleRaid}
+        />
+      </div>
+    </div>
+  );
+}
+
+function RaidFamilySelector({
+  player,
+  expedition,
+  character,
+  onToggleRaid,
+}: {
+  player: Player;
+  expedition: Expedition;
+  character: Character;
+  onToggleRaid: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    checked: boolean,
+  ) => void;
+}) {
+  const [addingRaid, setAddingRaid] = useState(false);
+  const selectedFamilies = RAID_FAMILIES.map((family) => {
+    const raids = RAID_DEFINITIONS.filter((raid) => raid.family === family.id);
+    const selected = raids.find((raid) =>
+      character.selectedRaids.includes(raid.name),
+    );
+    return { family, raids, selected };
+  }).filter((entry) => entry.selected);
+  const hiddenFamilies = RAID_FAMILIES.map((family) => {
+    const raids = RAID_DEFINITIONS.filter((raid) => raid.family === family.id);
+    const selected = raids.find((raid) =>
+      character.selectedRaids.includes(raid.name),
+    );
+    return { family, raids, selected };
+  }).filter((entry) => !entry.selected);
+
+  const toggleSelectedRaid = (raidName: string, checked: boolean) => {
+    onToggleRaid(player.id, expedition.id, character.id, raidName, checked);
+  };
+
+  return (
+    <div className="raid-family-list">
+      {selectedFamilies.map(({ family, raids, selected }) => {
+        return (
+          <div className="raid-family-row" key={family.id}>
+            <div className="raid-family-label">
+              <span>{family.label}</span>
+              {selected ? <small>{selected.gold.toLocaleString("ko-KR")}G</small> : null}
+            </div>
+            <div className="difficulty-buttons">
+              {raids.map((raid) => (
+                <button
+                  className={
+                    character.selectedRaids.includes(raid.name) ? "selected" : ""
+                  }
+                  key={raid.name}
+                  type="button"
+                  onClick={() =>
+                    toggleSelectedRaid(
+                      raid.name,
+                      !character.selectedRaids.includes(raid.name),
+                    )
+                  }
+                >
+                  {raid.variant}
+                </button>
+              ))}
+            </div>
+            {selected ? (
+              <button
+                className="remove-raid-button"
+                type="button"
+                onClick={() =>
+                  toggleSelectedRaid(selected.name, false)
+                }
+                aria-label={`${family.label} 레이드 삭제`}
+              >
+                ×
+              </button>
+            ) : null}
+          </div>
+        );
+      })}
+      {addingRaid ? (
+        <div className="raid-add-panel">
+          {hiddenFamilies.length ? (
+            hiddenFamilies.map(({ family, raids }) => (
+              <div className="raid-add-row" key={family.id}>
+                <span className="raid-add-label">{family.label}</span>
+                <div className="difficulty-buttons add-mode">
+                  {raids.map((raid) => (
+                    <button
+                      key={raid.name}
+                      type="button"
+                      onClick={() => {
+                        toggleSelectedRaid(raid.name, true);
+                        setAddingRaid(false);
+                      }}
+                    >
+                      {raid.variant}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <span className="raid-add-empty">추가할 수 있는 레이드가 없습니다.</span>
+          )}
+        </div>
+      ) : null}
+      <button
+        className="add-raid-button raid-add-button"
+        type="button"
+        onClick={() => setAddingRaid((current) => !current)}
+        disabled={!hiddenFamilies.length}
+      >
+        + 레이드 추가
+      </button>
+    </div>
+  );
+}
+
+function ResultPanel({
+  plan,
+  players,
+  stale,
+  onGenerate,
+}: {
+  plan: RaidPlanResult | null;
+  players: Player[];
+  stale: boolean;
+  onGenerate: () => void;
+}) {
+  const rows = useMemo(() => buildResultRows(plan), [plan]);
+
+  return (
+    <section className="result-shell">
+      <div className="result-heading">
+        <div>
+          <h2>자동구성 결과</h2>
+          <p>공석은 숨기고 내부 멤버만 표시합니다.</p>
+        </div>
+        <button className="dark-button" type="button" onClick={onGenerate}>
+          레이드 자동구성
+        </button>
+      </div>
+
+      {stale ? (
+        <div className="warning-bar">입력이 변경되었습니다. 다시 자동구성하세요.</div>
+      ) : null}
+
+      {plan?.warnings.length ? (
+        <div className="error-list">
+          {plan.warnings.map((warning) => (
+            <p key={warning}>{warning}</p>
+          ))}
+        </div>
+      ) : null}
+
+      {!plan ? (
+        <div className="empty-state">아직 생성된 공격대가 없습니다.</div>
+      ) : rows.length ? (
+        <div className="result-table-wrap">
+          <table className="result-table">
+            <thead>
+              <tr>
+                <th className="raid-name-col">레이드</th>
+                {players.map((player) => (
+                  <th key={player.id}>{player.name}</th>
+                ))}
+                <th className="summary-col">요약</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <ResultRow key={row.id} players={players} row={row} />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="empty-state">선택된 레이드가 없습니다.</div>
+      )}
+    </section>
+  );
+}
+
+type ResultRowModel = {
+  id: string;
+  raidName: string;
+  groupIndex: number;
+  group: RaidGroup;
+  membersByPlayer: Map<string, RaidGroup["members"][number]>;
+};
+
+function buildResultRows(plan: RaidPlanResult | null): ResultRowModel[] {
+  if (!plan) {
+    return [];
+  }
+
+  return Object.entries(plan.groupsByRaid).flatMap(([raidName, groups]) =>
+    groups.map((group, index) => ({
+      id: group.id,
+      raidName,
+      groupIndex: index + 1,
+      group,
+      membersByPlayer: new Map(
+        group.members.map((member) => [member.playerId, member]),
+      ),
+    })),
+  );
+}
+
+function ResultRow({
+  row,
+  players,
+}: {
+  row: ResultRowModel;
+  players: Player[];
+}) {
+  const dealerCount = row.group.members.filter(
+    (member) => member.role === "dealer",
+  ).length;
+  const supportCount = row.group.members.filter(
+    (member) => member.role === "support",
+  ).length;
+
+  return (
+    <tr>
+      <th className="raid-name-col">
+        <span>{row.raidName}</span>
+        <small>{row.groupIndex}공대</small>
+      </th>
+      {players.map((player) => {
+        const member = row.membersByPlayer.get(player.id);
+        return (
+          <td key={player.id}>
+            {member ? (
+              <div
+                className={
+                  member.role === "support"
+                    ? "assigned-cell support"
+                    : "assigned-cell dealer"
+                }
+              >
+                <strong>{member.className}</strong>
+                <span>{member.characterName}</span>
+              </div>
+            ) : null}
+          </td>
+        );
+      })}
+      <td className="summary-col">
+        <strong>딜러 {dealerCount}/{row.group.dealerSlots}</strong>
+        <span>서폿 {supportCount}/{row.group.supportSlots}</span>
+      </td>
+    </tr>
+  );
+}
+
+const makeExclusiveRaids = (raids: string[]) =>
+  raids.reduce<string[]>((selectedRaids, raidName) => {
+    const blockedRaids = getExclusiveRaidNames(raidName);
+    return [
+      ...selectedRaids.filter(
+        (selectedRaid) =>
+          selectedRaid !== raidName && !blockedRaids.includes(selectedRaid),
+      ),
+      raidName,
+    ];
+  }, []);
+
+const getRestorableCharacters = (expedition: Expedition) => {
+  const seenNames = new Set<string>();
+  const characters: Array<Pick<Character, "name" | "className">> = [];
+
+  expedition.deletedCharacters.forEach((character) => {
+    const name = character.name.trim();
+    if (!name || seenNames.has(name)) {
+      return;
+    }
+    seenNames.add(name);
+    characters.push({ name, className: character.className });
+  });
+
+  expedition.deletedCharacterNames.forEach((rawName) => {
+    const name = rawName.trim();
+    if (!name || seenNames.has(name)) {
+      return;
+    }
+    seenNames.add(name);
+    characters.push({ name, className: "" });
+  });
+
+  return characters;
+};
+
+const isSupportClass = (className: string) => {
+  const normalized = className.trim().toLowerCase();
+  return SUPPORT_CLASS_NAMES.some((supportClass) =>
+    normalized.includes(supportClass.toLowerCase()),
+  );
+};
+
+const formatItemLevel = (itemLevel: number) =>
+  itemLevel.toLocaleString("ko-KR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const formatDateTime = (isoValue: string) => {
+  const date = new Date(isoValue);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+};
