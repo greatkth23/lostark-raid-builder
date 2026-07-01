@@ -1,97 +1,65 @@
-# vinext-starter
+# Lost Ark Raid Builder
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+로스트아크 공격대 자동구성 웹앱입니다. 플레이어, 원정대, 캐릭터, 레이드 선택 정보를 브라우저에 저장하고, 조건을 만족하는 공격대 편성을 자동으로 만듭니다.
 
-## Prerequisites
+## 동작 방식
+
+- 멤버 목록과 레이드 선택 데이터는 각 브라우저의 `localStorage`에 저장됩니다.
+- 다른 컴퓨터나 다른 브라우저에서 접속하면 빈 상태로 시작합니다.
+- Lost Ark API 키는 우상단 톱니바퀴 설정에서 각 사용자가 직접 입력합니다.
+- API 키는 서버에 저장하지 않고 브라우저 저장소에만 보관합니다.
+- 공유 멤버 목록 저장소, 로그인, DB 저장 기능은 현재 포함되어 있지 않습니다.
+
+## 로컬 실행
+
+필수 환경:
 
 - Node.js `>=22.13.0`
 
-## Quick Start
+명령:
 
 ```bash
 npm install
 npm run dev
+```
+
+프로덕션 빌드 확인:
+
+```bash
 npm run build
 ```
 
-This starter does not use `wrangler.jsonc`.
+## Cloudflare 배포
 
-## Included Shape
+이 앱은 `/api/lostark/roster` API 라우트를 사용하므로 GitHub Pages 같은 정적 호스팅에는 맞지 않습니다. Cloudflare Workers 호환 빌드로 배포합니다.
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+1. Cloudflare에 로그인합니다.
 
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+npm exec wrangler login
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+2. Cloudflare 계정 이메일 인증을 완료합니다.
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+Workers 배포에는 Cloudflare 계정의 이메일 인증이 필요합니다. 인증되지 않은 계정에서는 배포 중 `code: 10034` 오류가 발생합니다.
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+3. 빌드와 배포를 실행합니다.
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+```bash
+npm run deploy:cloudflare
+```
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+배포가 성공하면 Wrangler가 공개 접속 URL을 출력합니다.
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+## 배포 후 확인
 
-## Useful Commands
+- 공개 URL에서 앱 첫 화면이 열리는지 확인합니다.
+- 톱니바퀴 설정에서 Lost Ark API 키를 입력합니다.
+- 대표 캐릭터 동기화가 동작하는지 확인합니다.
+- 새로고침 후 같은 브라우저에서 멤버 목록이 유지되는지 확인합니다.
+- 시크릿 창이나 다른 브라우저에서는 빈 멤버 목록으로 시작하는지 확인합니다.
+- 자동구성 결과가 기존 제약조건대로 생성되는지 확인합니다.
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+## 데이터 공유가 필요한 경우
 
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+현재 배포 방식은 “URL로 접속 가능한 개인 로컬 저장 앱”입니다. 여러 컴퓨터가 같은 멤버 목록을 공유하려면 D1 같은 서버 저장소와 동기화 기능을 별도로 추가해야 합니다.
