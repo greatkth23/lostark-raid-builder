@@ -25,7 +25,7 @@ export type RaidDefinition = {
   size: 4 | 8;
   dealerSlots: number;
   supportSlots: number;
-  gold?: number;
+  gold: number;
 };
 
 export type AssignedMember = {
@@ -95,11 +95,11 @@ export const RAID_DEFINITIONS: RaidDefinition[] = [
   { name: "세르카 노말", family: "serka", variant: "노말", size: 4, dealerSlots: 3, supportSlots: 1, gold: 32000 },
   { name: "세르카 하드", family: "serka", variant: "하드", size: 4, dealerSlots: 3, supportSlots: 1, gold: 44000 },
   { name: "세르카 나메", family: "serka", variant: "나이트메어", size: 4, dealerSlots: 3, supportSlots: 1, gold: 54000 },
-  { name: "3막 노말", family: "act3", variant: "노말", size: 8, dealerSlots: 6, supportSlots: 2 },
-  { name: "3막 하드", family: "act3", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2 },
-  { name: "2막 노말", family: "act2", variant: "노말", size: 8, dealerSlots: 6, supportSlots: 2 },
-  { name: "2막 하드", family: "act2", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2 },
-  { name: "1막 하드", family: "act1", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2 },
+  { name: "3막 노말", family: "act3", variant: "노말", size: 8, dealerSlots: 6, supportSlots: 2, gold: 21000 },
+  { name: "3막 하드", family: "act3", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2, gold: 27000 },
+  { name: "2막 노말", family: "act2", variant: "노말", size: 8, dealerSlots: 6, supportSlots: 2, gold: 16500 },
+  { name: "2막 하드", family: "act2", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2, gold: 23000 },
+  { name: "1막 하드", family: "act1", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2, gold: 18000 },
 ];
 
 export const RAID_LEVEL_PRESETS: Array<{ minLevel: number; raids: string[] }> = [

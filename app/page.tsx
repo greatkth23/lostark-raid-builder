@@ -1873,9 +1873,7 @@ function RaidFamilySelector({
           <div className="raid-family-row" key={family.id}>
             <div className="raid-family-label">
               <span>{family.label}</span>
-              {selected?.gold ? (
-                <small>{selected.gold.toLocaleString("ko-KR")}G</small>
-              ) : null}
+              {selected ? <small>{selected.gold.toLocaleString("ko-KR")}G</small> : null}
             </div>
             <div className="difficulty-buttons">
               {raids.map((raid) => (
