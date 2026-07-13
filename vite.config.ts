@@ -4,8 +4,8 @@ import { cloudflare } from "@cloudflare/vite-plugin";
 import hostingConfig from "./.openai/hosting.json";
 import { sites } from "./build/sites-vite-plugin";
 
-const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
-  "00000000-0000-4000-8000-000000000000";
+const CLOUDFLARE_D1_DATABASE_NAME = "lostark-raid-builder-db";
+const CLOUDFLARE_D1_DATABASE_ID = "df969583-75a9-44b3-b774-a56ae8bb756d";
 
 const { d1, r2 } = hostingConfig;
 
@@ -16,8 +16,8 @@ const localBindingConfig = {
     ? [
         {
           binding: d1,
-          database_name: "site-creator-d1",
-          database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
+          database_name: CLOUDFLARE_D1_DATABASE_NAME,
+          database_id: CLOUDFLARE_D1_DATABASE_ID,
         },
       ]
     : [],

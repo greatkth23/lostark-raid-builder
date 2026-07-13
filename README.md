@@ -34,10 +34,12 @@ npm run build
 
 ## Cloudflare 배포
 
-이 앱은 `/api/lostark/roster`와 D1을 사용하므로 GitHub Pages 같은 정적 호스팅에는 맞지 않습니다. Cloudflare Workers 호환 Sites 배포 흐름을 사용합니다.
+이 앱은 `/api/lostark/roster`와 D1을 사용하므로 GitHub Pages 같은 정적 호스팅에는 맞지 않습니다. Cloudflare Workers와 D1을 사용합니다.
 
 - `.openai/hosting.json`의 논리 D1 바인딩 이름은 `DB`입니다.
-- `drizzle/`의 마이그레이션이 빌드 산출물에 포함되며, 운영 배포 시 Sites가 실제 D1 생성·연결과 마이그레이션 적용을 담당합니다.
+- `vite.config.ts`에는 운영 D1 데이터베이스 이름과 ID가 연결되어 있습니다.
+- 최초 환경에서는 `drizzle/0000_lame_shard.sql`을 원격 D1에 적용한 뒤 배포합니다.
+- 이후 `npm run deploy:cloudflare`로 빌드와 Workers 배포를 실행합니다.
 - 운영 반영 전에는 `npm run build`와 localhost 동작을 먼저 확인합니다.
 
 ## 배포 후 확인
