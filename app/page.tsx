@@ -1,52 +1,34 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
   RAID_DEFINITIONS,
   buildRaidPlan,
   getAutoRaidsForLevel,
-  getExclusiveRaidNames,
   inferRoleFromClassName,
   type CharacterInput,
   type RaidGroup,
   type RaidPlanResult,
   type Role,
 } from "./lib/raidPlanner";
-
-type Character = {
-  id: string;
-  name: string;
-  serverName: string;
-  itemLevel: number;
-  combatPower: number;
-  className: string;
-  role: Role;
-  selectedRaids: string[];
-  raidsEdited: boolean;
-  roleEdited: boolean;
-};
-
-type Expedition = {
-  id: string;
-  name: string;
-  representativeName: string;
-  serverName: string;
-  lastSyncedAt: string;
-  charactersHidden: boolean;
-  deletedCharacterNames: string[];
-  deletedCharacters: Character[];
-  characters: Character[];
-};
-
-type Player = {
-  id: string;
-  name: string;
-  expeditions: Expedition[];
-};
+import {
+  applyRaidGroupOperation,
+  createExpedition,
+  createId,
+  createPlayer,
+  normalizePlayers,
+  type Character,
+  type Expedition,
+  type Player,
+  type RaidGroupOperation,
+  type RaidGroupRoom,
+} from "./lib/raidData";
 
 type RosterCharacter = {
   name: string;
@@ -56,7 +38,7 @@ type RosterCharacter = {
   combatPower: number;
 };
 
-type TabKey = "players" | "results";
+type TabKey = "players" | "status" | "results";
 
 const STORAGE_KEY = "lostark-raid-builder-v3";
 const LEGACY_STORAGE_KEYS = [
@@ -67,6 +49,7 @@ const API_KEY_STORAGE_KEY = "lostark-openapi-jwt";
 
 const TABS: Array<{ id: TabKey; label: string }> = [
   { id: "players", label: "멤버 목록" },
+  { id: "status", label: "레이드 현황" },
   { id: "results", label: "자동구성 결과" },
 ];
 
@@ -79,172 +62,13 @@ const RAID_FAMILIES = [
 
 const SUPPORT_CLASS_NAMES = ["도화가", "홀리나이트", "바드", "아티스트", "artist", "bard", "paladin"];
 
-const createId = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-const createCharacter = (): Character => ({
-  id: createId(),
-  name: "",
-  serverName: "",
-  itemLevel: 1710,
-  combatPower: 0,
-  className: "",
-  role: "dealer",
-  selectedRaids: getAutoRaidsForLevel(1710),
-  raidsEdited: false,
-  roleEdited: false,
-});
-
-const createExpedition = (index: number): Expedition => ({
-  id: createId(),
-  name: `원정대 ${index}`,
-  representativeName: "",
-  serverName: "",
-  lastSyncedAt: "",
-  charactersHidden: false,
-  deletedCharacterNames: [],
-  deletedCharacters: [],
-  characters: [],
-});
-
-const createPlayer = (index: number): Player => ({
-  id: createId(),
-  name: `플레이어 ${index}`,
-  expeditions: [createExpedition(1)],
-});
-
-const normalizePlayers = (value: unknown): Player[] | null => {
-  if (!Array.isArray(value)) {
-    return null;
-  }
-
-  const players = value
-    .map((player, playerIndex) => normalizePlayer(player, playerIndex))
-    .filter((player): player is Player => Boolean(player));
-
-  return players;
-};
-
-const normalizePlayer = (value: unknown, playerIndex: number): Player | null => {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  const source = value as Partial<
-    Player & {
-      representativeName: string;
-      serverName: string;
-      lastSyncedAt: string;
-      characters: Character[];
-    }
-  >;
-  const expeditions = Array.isArray(source.expeditions)
-    ? source.expeditions
-        .map((expedition, expeditionIndex) =>
-          normalizeExpedition(expedition, expeditionIndex),
-        )
-        .filter((expedition): expedition is Expedition => Boolean(expedition))
-    : [
-        normalizeExpedition(
-          {
-            id: source.id,
-            name: "원정대 1",
-            representativeName: source.representativeName,
-            serverName: source.serverName,
-            lastSyncedAt: source.lastSyncedAt,
-            characters: source.characters,
-          },
-          0,
-        ),
-      ].filter((expedition): expedition is Expedition => Boolean(expedition));
-
-  return {
-    id: typeof source.id === "string" ? source.id : createId(),
-    name:
-      typeof source.name === "string" && source.name.trim()
-        ? source.name
-        : `플레이어 ${playerIndex + 1}`,
-    expeditions: expeditions.length ? expeditions : [createExpedition(1)],
-  };
-};
-
-const normalizeExpedition = (
-  value: unknown,
-  expeditionIndex: number,
-): Expedition | null => {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  const source = value as Partial<Expedition>;
-  const characters = Array.isArray(source.characters)
-    ? source.characters
-        .map(normalizeCharacter)
-        .filter((character): character is Character => Boolean(character))
-    : [];
-  const deletedCharacterNames = Array.isArray(source.deletedCharacterNames)
-    ? source.deletedCharacterNames.filter(
-        (name): name is string => typeof name === "string" && Boolean(name.trim()),
-      )
-    : [];
-  const deletedCharacters = Array.isArray(source.deletedCharacters)
-    ? source.deletedCharacters
-        .map(normalizeCharacter)
-        .filter((character): character is Character => Boolean(character))
-    : [];
-
-  return {
-    id: typeof source.id === "string" ? source.id : createId(),
-    name:
-      typeof source.name === "string" && source.name.trim()
-        ? source.name
-        : `원정대 ${expeditionIndex + 1}`,
-    representativeName:
-      typeof source.representativeName === "string"
-        ? source.representativeName
-        : "",
-    serverName:
-      typeof source.serverName === "string" ? source.serverName : "",
-    lastSyncedAt:
-      typeof source.lastSyncedAt === "string" ? source.lastSyncedAt : "",
-    charactersHidden: Boolean(source.charactersHidden),
-    deletedCharacterNames,
-    deletedCharacters,
-    characters,
-  };
-};
-
-const normalizeCharacter = (value: unknown): Character | null => {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
-  const source = value as Partial<Character>;
-  const itemLevel = Number(source.itemLevel) || 0;
-  const selectedRaids = Array.isArray(source.selectedRaids)
-    ? makeExclusiveRaids(
-        source.selectedRaids.filter((raid): raid is string => typeof raid === "string"),
-      )
-    : getAutoRaidsForLevel(itemLevel);
-
-  return {
-    id: typeof source.id === "string" ? source.id : createId(),
-    name: typeof source.name === "string" ? source.name : "",
-    serverName: typeof source.serverName === "string" ? source.serverName : "",
-    itemLevel,
-    combatPower: Number(source.combatPower) || 0,
-    className: typeof source.className === "string" ? source.className : "",
-    role: source.role === "support" ? "support" : "dealer",
-    selectedRaids,
-    raidsEdited: Boolean(source.raidsEdited),
-    roleEdited: Boolean(source.roleEdited),
-  };
-};
 
 export default function Home() {
   const [players, setPlayers] = useState<Player[]>([createPlayer(1)]);
+  const [room, setRoom] = useState<RaidGroupRoom | null>(null);
+  const [raidWeek, setRaidWeek] = useState("");
+  const [legacyPlayers, setLegacyPlayers] = useState<Player[] | null>(null);
+  const [booting, setBooting] = useState(true);
   const [apiKey, setApiKey] = useState("");
   const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("players");
@@ -255,6 +79,102 @@ export default function Home() {
   const [syncingId, setSyncingId] = useState("");
   const [expandedCharacters, setExpandedCharacters] = useState<Set<string>>(new Set());
   const [pendingScrollPlayerId, setPendingScrollPlayerId] = useState("");
+  const roomRef = useRef<RaidGroupRoom | null>(null);
+  const raidWeekRef = useRef("");
+  const pendingMutationsRef = useRef(0);
+  const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
+
+  const applySnapshot = useCallback(
+    (snapshot: { room: RaidGroupRoom; players: Player[]; raidWeek: string }) => {
+      const normalized = normalizePlayers(snapshot.players) ?? [];
+      roomRef.current = snapshot.room;
+      raidWeekRef.current = snapshot.raidWeek;
+      setRoom(snapshot.room);
+      setPlayers(normalized);
+      setRaidWeek(snapshot.raidWeek);
+    },
+    [],
+  );
+
+  const loadSharedState = useCallback(
+    async (conditional = true) => {
+      const currentRoom = roomRef.current;
+      if (!currentRoom || pendingMutationsRef.current > 0) return;
+      const query = conditional
+        ? `?since=${currentRoom.revision}&week=${encodeURIComponent(raidWeekRef.current)}`
+        : "";
+      const response = await fetch(`/api/raid-group${query}`, {
+        cache: "no-store",
+      });
+      if (response.status === 204) return;
+      if (response.status === 401) {
+        roomRef.current = null;
+        setRoom(null);
+        return;
+      }
+      if (!response.ok) return;
+      applySnapshot(await response.json());
+    },
+    [applySnapshot],
+  );
+
+  const queueMutation = useCallback(
+    (operation: RaidGroupOperation) => {
+      pendingMutationsRef.current += 1;
+      mutationQueueRef.current = mutationQueueRef.current
+        .catch(() => undefined)
+        .then(async () => {
+          const response = await fetch("/api/raid-group", {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ operation }),
+          });
+          const body = (await response.json().catch(() => ({}))) as {
+            message?: string;
+            revision?: number;
+            raidWeek?: string;
+          };
+          if (!response.ok) {
+            if (response.status === 401) {
+              roomRef.current = null;
+              setRoom(null);
+            }
+            throw new Error(body.message ?? "공유 데이터를 저장하지 못했습니다.");
+          }
+          if (roomRef.current && typeof body.revision === "number") {
+            const nextRoom = { ...roomRef.current, revision: body.revision };
+            roomRef.current = nextRoom;
+            setRoom(nextRoom);
+          }
+          if (body.raidWeek) {
+            raidWeekRef.current = body.raidWeek;
+            setRaidWeek(body.raidWeek);
+          }
+        })
+        .catch((error) => {
+          setNotice(
+            error instanceof Error
+              ? error.message
+              : "공유 데이터를 저장하지 못했습니다.",
+          );
+        })
+        .finally(() => {
+          pendingMutationsRef.current -= 1;
+          if (pendingMutationsRef.current === 0) void loadSharedState(false);
+        });
+    },
+    [loadSharedState],
+  );
+
+  const commitOperation = useCallback(
+    (operation: RaidGroupOperation) => {
+      setPlayers((current) =>
+        applyRaidGroupOperation(current, operation, raidWeekRef.current),
+      );
+      queueMutation(operation);
+    },
+    [queueMutation],
+  );
 
   const fingerprint = useMemo(() => JSON.stringify(players), [players]);
   const isPlanStale = Boolean(generatedPlan) && generatedFingerprint !== fingerprint;
@@ -271,11 +191,13 @@ export default function Home() {
             itemLevel: character.itemLevel,
             className: character.className.trim(),
             role: character.role,
-            selectedRaids: character.selectedRaids,
+            selectedRaids: character.selectedRaids.filter(
+              (raidName) => character.raidCompletions[raidName] !== raidWeek,
+            ),
           })),
         ),
       ),
-    [players],
+    [players, raidWeek],
   );
 
   const selectedRaidCount = useMemo(
@@ -288,7 +210,8 @@ export default function Home() {
   );
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
+    let cancelled = false;
+    const initialize = async () => {
       const stored =
         window.localStorage.getItem(STORAGE_KEY) ??
         LEGACY_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(Boolean);
@@ -301,31 +224,48 @@ export default function Home() {
       if (stored) {
         try {
           const normalized = normalizePlayers(JSON.parse(stored));
-          if (normalized) {
-            setPlayers(normalized.length ? normalized : [createPlayer(1)]);
-          }
+          if (normalized?.length) setLegacyPlayers(normalized);
         } catch {
           setNotice("저장된 데이터를 읽지 못했습니다.");
         }
       }
 
+      try {
+        const response = await fetch("/api/raid-group", { cache: "no-store" });
+        if (response.ok && !cancelled) applySnapshot(await response.json());
+      } catch {
+        if (!cancelled) setNotice("서버 저장소에 연결하지 못했습니다.");
+      }
+
+      if (cancelled) return;
       setHydrated(true);
-    }, 0);
+      setBooting(false);
+    };
+    void initialize();
 
-    return () => window.clearTimeout(timeoutId);
-  }, []);
-
-  useEffect(() => {
-    if (hydrated) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(players));
-    }
-  }, [hydrated, players]);
+    return () => {
+      cancelled = true;
+    };
+  }, [applySnapshot]);
 
   useEffect(() => {
     if (hydrated) {
       window.localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
     }
   }, [apiKey, hydrated]);
+
+  useEffect(() => {
+    if (!room) return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") void loadSharedState(true);
+    };
+    const intervalId = window.setInterval(refresh, 5_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [loadSharedState, room]);
 
   useEffect(() => {
     if (!pendingScrollPlayerId) {
@@ -341,11 +281,11 @@ export default function Home() {
   }, [pendingScrollPlayerId]);
 
   const updatePlayer = (playerId: string, patch: Partial<Player>) => {
-    setPlayers((current) =>
-      current.map((player) =>
-        player.id === playerId ? { ...player, ...patch } : player,
-      ),
-    );
+    commitOperation({
+      type: "player.update",
+      playerId,
+      name: typeof patch.name === "string" ? patch.name : "",
+    });
   };
 
   const updateExpedition = (
@@ -353,88 +293,50 @@ export default function Home() {
     expeditionId: string,
     patch: Partial<Expedition>,
   ) => {
-    setPlayers((current) =>
-      current.map((player) =>
-        player.id === playerId
-          ? {
-              ...player,
-              expeditions: player.expeditions.map((expedition) =>
-                expedition.id === expeditionId
-                  ? { ...expedition, ...patch }
-                  : expedition,
-              ),
-            }
-          : player,
-      ),
-    );
-  };
-
-  const updateCharacter = (
-    playerId: string,
-    expeditionId: string,
-    characterId: string,
-    updater: (character: Character) => Character,
-  ) => {
-    setPlayers((current) =>
-      current.map((player) =>
-        player.id === playerId
-          ? {
-              ...player,
-              expeditions: player.expeditions.map((expedition) =>
-                expedition.id === expeditionId
-                  ? {
-                      ...expedition,
-                      characters: expedition.characters.map((character) =>
-                        character.id === characterId ? updater(character) : character,
-                      ),
-                    }
-                  : expedition,
-              ),
-            }
-          : player,
-      ),
-    );
+    commitOperation({
+      type: "expedition.update",
+      playerId,
+      expeditionId,
+      patch: {
+        ...(typeof patch.name === "string" ? { name: patch.name } : {}),
+        ...(typeof patch.representativeName === "string"
+          ? { representativeName: patch.representativeName }
+          : {}),
+        ...(typeof patch.serverName === "string"
+          ? { serverName: patch.serverName }
+          : {}),
+        ...(typeof patch.lastSyncedAt === "string"
+          ? { lastSyncedAt: patch.lastSyncedAt }
+          : {}),
+        ...(typeof patch.charactersHidden === "boolean"
+          ? { charactersHidden: patch.charactersHidden }
+          : {}),
+      },
+    });
   };
 
   const addPlayer = () => {
     const nextPlayer = createPlayer(players.length + 1);
-    setPlayers((current) => [...current, nextPlayer]);
+    commitOperation({ type: "player.add", player: nextPlayer });
     setPendingScrollPlayerId(nextPlayer.id);
   };
 
   const removePlayer = (playerId: string) => {
-    setPlayers((current) => current.filter((player) => player.id !== playerId));
+    commitOperation({ type: "player.remove", playerId });
   };
 
   const addExpedition = (playerId: string) => {
-    setPlayers((current) =>
-      current.map((player) =>
-        player.id === playerId
-          ? {
-              ...player,
-              expeditions: [
-                ...player.expeditions,
-                createExpedition(player.expeditions.length + 1),
-              ],
-            }
-          : player,
-      ),
-    );
+    const player = players.find((candidate) => candidate.id === playerId);
+    if (!player) return;
+    commitOperation({
+      type: "expedition.add",
+      playerId,
+      expedition: createExpedition(player.expeditions.length + 1),
+    });
   };
 
   const removeExpedition = (playerId: string, expeditionId: string) => {
-    setPlayers((current) =>
-      current.map((player) =>
-        player.id === playerId
-          ? {
-              ...player,
-              expeditions: player.expeditions.filter(
-                (expedition) => expedition.id !== expeditionId,
-              ),
-            }
-          : player,
-      ),
-    );
+    commitOperation({ type: "expedition.remove", playerId, expeditionId });
   };
 
   const restoreCharacter = (
@@ -442,37 +344,12 @@ export default function Home() {
     expeditionId: string,
     characterName: string,
   ) => {
-    setPlayers((current) =>
-      current.map((player) =>
-        player.id === playerId
-          ? {
-              ...player,
-              expeditions: player.expeditions.map((expedition) =>
-                expedition.id === expeditionId
-                  ? (() => {
-                      const trimmedName = characterName.trim();
-                      const restoredCharacter =
-                        expedition.deletedCharacters.find(
-                          (character) => character.name.trim() === trimmedName,
-                        ) ?? { ...createCharacter(), name: trimmedName };
-
-                      return {
-                        ...expedition,
-                        deletedCharacterNames: expedition.deletedCharacterNames.filter(
-                          (name) => name.trim() !== trimmedName,
-                        ),
-                        deletedCharacters: expedition.deletedCharacters.filter(
-                          (character) => character.name.trim() !== trimmedName,
-                        ),
-                        characters: [...expedition.characters, restoredCharacter],
-                      };
-                    })()
-                  : expedition,
-              ),
-            }
-          : player,
-      ),
-    );
+    commitOperation({
+      type: "character.restore",
+      playerId,
+      expeditionId,
+      characterName,
+    });
   };
 
   const removeCharacter = (
@@ -480,49 +357,12 @@ export default function Home() {
     expeditionId: string,
     characterId: string,
   ) => {
-    setPlayers((current) =>
-      current.map((player) =>
-        player.id === playerId
-          ? {
-              ...player,
-              expeditions: player.expeditions.map((expedition) =>
-                expedition.id === expeditionId
-                  ? (() => {
-                      const removedCharacter = expedition.characters.find(
-                        (character) => character.id === characterId,
-                      );
-                      const removedName = removedCharacter?.name.trim();
-                      return {
-                        ...expedition,
-                        deletedCharacterNames: removedName
-                          ? Array.from(
-                              new Set([
-                                ...expedition.deletedCharacterNames,
-                                removedName,
-                              ]),
-                            )
-                          : expedition.deletedCharacterNames,
-                        deletedCharacters:
-                          removedCharacter && removedName
-                            ? [
-                                ...expedition.deletedCharacters.filter(
-                                  (character) =>
-                                    character.name.trim() !== removedName,
-                                ),
-                                removedCharacter,
-                              ]
-                            : expedition.deletedCharacters,
-                        characters: expedition.characters.filter(
-                          (character) => character.id !== characterId,
-                        ),
-                      };
-                    })()
-                  : expedition,
-              ),
-            }
-          : player,
-      ),
-    );
+    commitOperation({
+      type: "character.remove",
+      playerId,
+      expeditionId,
+      characterId,
+    });
   };
 
   const setCharacterRole = (
@@ -531,11 +371,13 @@ export default function Home() {
     characterId: string,
     role: Role,
   ) => {
-    updateCharacter(playerId, expeditionId, characterId, (character) => ({
-      ...character,
+    commitOperation({
+      type: "character.role",
+      playerId,
+      expeditionId,
+      characterId,
       role,
-      roleEdited: true,
-    }));
+    });
   };
 
   const toggleRaid = (
@@ -545,34 +387,18 @@ export default function Home() {
     raidName: string,
     checked: boolean,
   ) => {
-    updateCharacter(playerId, expeditionId, characterId, (character) => {
-      const blockedRaids = getExclusiveRaidNames(raidName);
-      const nextRaids = checked
-        ? [...character.selectedRaids.filter((raid) => !blockedRaids.includes(raid) && raid !== raidName), raidName]
-        : character.selectedRaids.filter((raid) => raid !== raidName);
-
-      return {
-        ...character,
-        selectedRaids: makeExclusiveRaids(nextRaids),
-        raidsEdited: true,
-      };
+    commitOperation({
+      type: "character.raid",
+      playerId,
+      expeditionId,
+      characterId,
+      raidName,
+      checked,
     });
   };
 
   const resetAllRaids = () => {
-    setPlayers((current) =>
-      current.map((player) => ({
-        ...player,
-        expeditions: player.expeditions.map((expedition) => ({
-          ...expedition,
-          characters: expedition.characters.map((character) => ({
-            ...character,
-            selectedRaids: getAutoRaidsForLevel(character.itemLevel),
-            raidsEdited: false,
-          })),
-        })),
-      })),
-    );
+    commitOperation({ type: "raids.reset" });
     setNotice("아이템 레벨 기준으로 레이드를 다시 자동 등록했습니다.");
   };
 
@@ -628,20 +454,11 @@ export default function Home() {
 
     try {
       const roster = await fetchRoster(expedition.representativeName);
-      setPlayers((current) =>
-        current.map((candidate) =>
-          candidate.id === playerId
-            ? {
-                ...candidate,
-                expeditions: candidate.expeditions.map((currentExpedition) =>
-                  currentExpedition.id === expeditionId
-                    ? mergeRosterIntoExpedition(currentExpedition, roster)
-                    : currentExpedition,
-                ),
-              }
-            : candidate,
-        ),
-      );
+      commitOperation({
+        type: "expedition.replace",
+        playerId,
+        expedition: mergeRosterIntoExpedition(expedition, roster),
+      });
       setGeneratedPlan(null);
       setGeneratedFingerprint("");
       setNotice(`${expedition.name}: 캐릭터 ${roster.length}명을 동기화했습니다.`);
@@ -670,20 +487,11 @@ export default function Home() {
         try {
           setSyncingId(`${player.id}:${expedition.id}`);
           const roster = await fetchRoster(expedition.representativeName);
-          setPlayers((current) =>
-            current.map((candidate) =>
-              candidate.id === player.id
-                ? {
-                    ...candidate,
-                    expeditions: candidate.expeditions.map((currentExpedition) =>
-                      currentExpedition.id === expedition.id
-                        ? mergeRosterIntoExpedition(currentExpedition, roster)
-                        : currentExpedition,
-                    ),
-                  }
-                : candidate,
-            ),
-          );
+          commitOperation({
+            type: "expedition.replace",
+            playerId: player.id,
+            expedition: mergeRosterIntoExpedition(expedition, roster),
+          });
           syncedCount += 1;
         } catch {
           // Keep syncing the remaining rosters.
@@ -697,12 +505,89 @@ export default function Home() {
     setNotice(`원정대 ${syncedCount}개를 동기화했습니다.`);
   };
 
+  const setRaidCompletion = (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    completed: boolean,
+  ) => {
+    commitOperation({
+      type: "completion.set",
+      playerId,
+      expeditionId,
+      characterId,
+      raidName,
+      completed,
+    });
+  };
+
+  const resetRaidCompletions = () => {
+    if (!window.confirm("이번 주 레이드 완료 체크를 모두 초기화할까요?")) return;
+    commitOperation({ type: "completion.reset" });
+    setNotice("이번 주 레이드 완료 체크를 모두 초기화했습니다.");
+  };
+
+  const leaveRaidGroup = async () => {
+    await fetch("/api/raid-group", { method: "DELETE" }).catch(() => undefined);
+    roomRef.current = null;
+    raidWeekRef.current = "";
+    setRoom(null);
+    setRaidWeek("");
+    setPlayers([createPlayer(1)]);
+    setGeneratedPlan(null);
+    setGeneratedFingerprint("");
+    setNotice("");
+  };
+
+  const completedRaidCount = players.reduce(
+    (count, player) =>
+      count +
+      player.expeditions.reduce(
+        (expeditionCount, expedition) =>
+          expeditionCount +
+          expedition.characters.reduce(
+            (characterCount, character) =>
+              characterCount +
+              character.selectedRaids.filter(
+                (raidName) => character.raidCompletions[raidName] === raidWeek,
+              ).length,
+            0,
+          ),
+        0,
+      ),
+    0,
+  );
+
   const totalGroups = generatedPlan
     ? Object.values(generatedPlan.groupsByRaid).reduce(
         (count, groups) => count + groups.length,
         0,
       )
     : 0;
+
+  if (booting) {
+    return <div className="room-loading">공유 공격대 정보를 불러오는 중입니다.</div>;
+  }
+
+  if (!room) {
+    return (
+      <RaidGroupGate
+        legacyPlayers={legacyPlayers}
+        notice={notice}
+        onEntered={(snapshot, imported) => {
+          applySnapshot(snapshot);
+          setNotice("");
+          if (imported) {
+            [STORAGE_KEY, ...LEGACY_STORAGE_KEYS].forEach((key) =>
+              window.localStorage.removeItem(key),
+            );
+            setLegacyPlayers(null);
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f7f8fb] text-[#151923]">
@@ -714,15 +599,20 @@ export default function Home() {
               로스트아크 공격대 자동구성
             </h1>
             <div className="metric-row">
+              <span>공격대 {room.name}</span>
               <span>플레이어 {players.length}</span>
               <span>원정대 {players.reduce((count, player) => count + player.expeditions.length, 0)}</span>
               <span>캐릭터 {characterInputs.length}</span>
               <span>선택 레이드 {selectedRaidCount}</span>
+              <span>완료 {completedRaidCount}</span>
               <span>생성 공대 {totalGroups}</span>
             </div>
           </div>
 
           <div className="header-actions">
+            <button className="ghost-button" type="button" onClick={leaveRaidGroup}>
+              공격대 전환
+            </button>
             <button
               className="gear-button"
               type="button"
@@ -790,6 +680,13 @@ export default function Home() {
               })
             }
           />
+        ) : activeTab === "status" ? (
+          <RaidStatusPanel
+            players={players}
+            raidWeek={raidWeek}
+            onSetCompletion={setRaidCompletion}
+            onReset={resetRaidCompletions}
+          />
         ) : (
           <ResultPanel
             plan={generatedPlan}
@@ -800,6 +697,258 @@ export default function Home() {
         )}
       </div>
     </main>
+  );
+}
+
+function RaidGroupGate({
+  legacyPlayers,
+  notice,
+  onEntered,
+}: {
+  legacyPlayers: Player[] | null;
+  notice: string;
+  onEntered: (
+    snapshot: { room: RaidGroupRoom; players: Player[]; raidWeek: string },
+    imported: boolean,
+  ) => void;
+}) {
+  const [mode, setMode] = useState<"join" | "create">("join");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [importLegacy, setImportLegacy] = useState(Boolean(legacyPlayers?.length));
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError("");
+    try {
+      const shouldImport =
+        mode === "create" && importLegacy && Boolean(legacyPlayers?.length);
+      const response = await fetch("/api/raid-group", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: mode,
+          name,
+          password,
+          players: shouldImport ? legacyPlayers : undefined,
+        }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        room?: RaidGroupRoom;
+        players?: Player[];
+        raidWeek?: string;
+        message?: string;
+      };
+      if (!response.ok || !body.room || !body.players || !body.raidWeek) {
+        throw new Error(body.message ?? "공격대에 입장하지 못했습니다.");
+      }
+      onEntered(
+        { room: body.room, players: body.players, raidWeek: body.raidWeek },
+        shouldImport,
+      );
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "공격대에 입장하지 못했습니다.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="room-gate-page">
+      <section className="room-gate-card">
+        <p className="room-gate-kicker">Lost Ark Raid Builder</p>
+        <h1>공유 공격대에 입장하세요</h1>
+        <p className="room-gate-description">
+          같은 공격대 이름과 비밀번호를 사용하는 모두가 멤버 목록과 레이드
+          현황을 함께 편집할 수 있습니다.
+        </p>
+
+        <div className="room-mode-tabs" role="tablist" aria-label="공격대 입장 방식">
+          <button
+            className={mode === "join" ? "active" : ""}
+            type="button"
+            onClick={() => setMode("join")}
+          >
+            공격대 가입
+          </button>
+          <button
+            className={mode === "create" ? "active" : ""}
+            type="button"
+            onClick={() => setMode("create")}
+          >
+            새 공격대 생성
+          </button>
+        </div>
+
+        <form className="room-gate-form" onSubmit={submit}>
+          <label>
+            <span>공격대 이름</span>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              minLength={2}
+              maxLength={40}
+              autoComplete="organization"
+              required
+            />
+          </label>
+          <label>
+            <span>비밀번호</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              minLength={6}
+              maxLength={72}
+              autoComplete={mode === "join" ? "current-password" : "new-password"}
+              required
+            />
+            <small>6자 이상 입력하세요.</small>
+          </label>
+
+          {mode === "create" && legacyPlayers?.length ? (
+            <label className="legacy-import-option">
+              <input
+                type="checkbox"
+                checked={importLegacy}
+                onChange={(event) => setImportLegacy(event.target.checked)}
+              />
+              <span>
+                이 브라우저에 저장된 멤버 {legacyPlayers.length}명을 새 공격대로
+                가져오기
+              </span>
+            </label>
+          ) : null}
+
+          {error || notice ? (
+            <div className="room-gate-error">{error || notice}</div>
+          ) : null}
+
+          <button className="room-submit-button" type="submit" disabled={submitting}>
+            {submitting
+              ? "처리 중..."
+              : mode === "create"
+                ? "공격대 생성"
+                : "공격대 가입"}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
+function RaidStatusPanel({
+  players,
+  raidWeek,
+  onSetCompletion,
+  onReset,
+}: {
+  players: Player[];
+  raidWeek: string;
+  onSetCompletion: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    completed: boolean,
+  ) => void;
+  onReset: () => void;
+}) {
+  const characterCount = players.reduce(
+    (count, player) =>
+      count +
+      player.expeditions.reduce(
+        (expeditionCount, expedition) =>
+          expeditionCount + expedition.characters.length,
+        0,
+      ),
+    0,
+  );
+
+  return (
+    <section className="raid-status-shell">
+      <div className="raid-status-heading">
+        <div>
+          <h2>레이드 현황</h2>
+          <p>
+            {formatRaidWeek(raidWeek)} 주차 · 매주 수요일 오전 6시에 완료 표시가
+            자동 초기화됩니다.
+          </p>
+        </div>
+        <button className="ghost-button" type="button" onClick={onReset}>
+          완료 전체 초기화
+        </button>
+      </div>
+
+      {characterCount === 0 ? (
+        <div className="empty-state">등록된 캐릭터가 없습니다.</div>
+      ) : (
+        <div className="raid-status-player-list">
+          {players.map((player) => (
+            <article className="raid-status-player" key={player.id}>
+              <h3>{player.name}</h3>
+              <div className="raid-status-character-list">
+                {player.expeditions.flatMap((expedition) =>
+                  expedition.characters.map((character) => (
+                    <div className="raid-status-character" key={character.id}>
+                      <div className="raid-status-character-title">
+                        <strong>{character.name || "이름 없는 캐릭터"}</strong>
+                        <span>
+                          {character.className || "직업 미입력"} · {expedition.name}
+                        </span>
+                      </div>
+                      <div className="raid-status-check-list">
+                        {character.selectedRaids.length ? (
+                          character.selectedRaids.map((raidName) => {
+                            const completed =
+                              character.raidCompletions[raidName] === raidWeek;
+                            return (
+                              <label
+                                className={
+                                  completed
+                                    ? "raid-status-check completed"
+                                    : "raid-status-check"
+                                }
+                                key={raidName}
+                              >
+                                <span>{raidName}</span>
+                                <input
+                                  type="checkbox"
+                                  checked={completed}
+                                  onChange={(event) =>
+                                    onSetCompletion(
+                                      player.id,
+                                      expedition.id,
+                                      character.id,
+                                      raidName,
+                                      event.target.checked,
+                                    )
+                                  }
+                                  aria-label={`${character.name} ${raidName} 완료`}
+                                />
+                              </label>
+                            );
+                          })
+                        ) : (
+                          <span className="raid-status-empty">선택된 레이드 없음</span>
+                        )}
+                      </div>
+                    </div>
+                  )),
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -889,6 +1038,7 @@ function mergeRosterIntoExpedition(
       selectedRaids: previous?.raidsEdited
         ? previous.selectedRaids
         : getAutoRaidsForLevel(rosterCharacter.itemLevel),
+      raidCompletions: previous?.raidCompletions ?? {},
       raidsEdited: previous?.raidsEdited ?? false,
       roleEdited: previous?.roleEdited ?? false,
     } satisfies Character;
@@ -1833,18 +1983,6 @@ function ResultRow({
   );
 }
 
-const makeExclusiveRaids = (raids: string[]) =>
-  raids.reduce<string[]>((selectedRaids, raidName) => {
-    const blockedRaids = getExclusiveRaidNames(raidName);
-    return [
-      ...selectedRaids.filter(
-        (selectedRaid) =>
-          selectedRaid !== raidName && !blockedRaids.includes(selectedRaid),
-      ),
-      raidName,
-    ];
-  }, []);
-
 const getRestorableCharacters = (expedition: Expedition) => {
   const seenNames = new Set<string>();
   const characters: Array<Pick<Character, "name" | "className">> = [];
@@ -1882,6 +2020,12 @@ const formatItemLevel = (itemLevel: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+const formatRaidWeek = (week: string) => {
+  const [year, month, day] = week.split("-").map(Number);
+  if (!year || !month || !day) return "이번";
+  return `${month}월 ${day}일 시작`;
+};
 
 const formatDateTime = (isoValue: string) => {
   const date = new Date(isoValue);

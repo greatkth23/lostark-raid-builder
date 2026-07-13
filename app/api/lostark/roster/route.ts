@@ -17,6 +17,13 @@ const LOSTARK_API_BASE = "https://developer-lostark.game.onstove.com";
 
 export async function POST(request: Request) {
   try {
+    if (!(await getRaidGroupSession(request))) {
+      return Response.json(
+        { message: "공격대에 가입해야 원정대를 동기화할 수 있습니다." },
+        { status: 401 },
+      );
+    }
+
     const body = (await request.json()) as {
       apiKey?: string;
       characterName?: string;
@@ -119,3 +126,4 @@ const parseGameNumber = (value: string | number | null) => {
   const parsed = Number(value.replaceAll(",", ""));
   return Number.isFinite(parsed) ? parsed : 0;
 };
+import { getRaidGroupSession } from "../../../lib/raidGroupStore";

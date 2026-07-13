@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "로스트아크 공격대 자동구성",
-  description: "로스트아크 레이드 공격대 자동구성 로컬 웹앱",
+  description: "멤버와 레이드 진행 현황을 함께 관리하는 로스트아크 공격대 자동구성 도구",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",

@@ -156,12 +156,273 @@ button:disabled {
 }
 
 .member-shell,
-.result-shell {
+.result-shell,
+.raid-status-shell {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #ffffff;
   padding: 28px 30px;
   box-shadow: 0 14px 32px rgb(30 41 59 / 6%);
+}
+
+.room-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: #5b6d86;
+  background: #f7f8fb;
+  font-weight: 700;
+}
+
+.room-gate-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(55, 92, 160, 0.14), transparent 32rem),
+    #f4f6fa;
+}
+
+.room-gate-card {
+  width: min(100%, 480px);
+  padding: 34px;
+  border: 1px solid #dce2eb;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 18px 50px rgba(31, 44, 66, 0.12);
+}
+
+.room-gate-kicker {
+  margin: 0 0 8px;
+  color: #5b6d86;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.room-gate-card h1 {
+  margin: 0;
+  font-size: 27px;
+  line-height: 1.25;
+}
+
+.room-gate-description {
+  margin: 12px 0 24px;
+  color: #66758b;
+  line-height: 1.65;
+}
+
+.room-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  border-radius: 10px;
+  background: #eef1f6;
+}
+
+.room-mode-tabs button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  color: #647287;
+  background: transparent;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.room-mode-tabs button.active {
+  color: #1f2a3a;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(36, 48, 67, 0.09);
+}
+
+.room-gate-form {
+  display: grid;
+  gap: 17px;
+  margin-top: 22px;
+}
+
+.room-gate-form > label:not(.legacy-import-option) {
+  display: grid;
+  gap: 7px;
+  color: #344258;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.room-gate-form input[type="text"],
+.room-gate-form input[type="password"],
+.room-gate-form input:not([type]) {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #cfd7e3;
+  border-radius: 9px;
+  outline: none;
+  background: #ffffff;
+}
+
+.room-gate-form input:focus {
+  border-color: #4f6f9f;
+  box-shadow: 0 0 0 3px rgba(79, 111, 159, 0.12);
+}
+
+.room-gate-form small {
+  color: #78869a;
+  font-weight: 500;
+}
+
+.legacy-import-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid #dbe2ec;
+  border-radius: 10px;
+  color: #47566c;
+  background: #f7f9fc;
+  font-size: 14px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.legacy-import-option input {
+  margin-top: 3px;
+}
+
+.room-gate-error {
+  padding: 11px 13px;
+  border-radius: 8px;
+  color: #a33b3b;
+  background: #fff1f1;
+  font-size: 14px;
+}
+
+.room-submit-button {
+  min-height: 47px;
+  border: 0;
+  border-radius: 10px;
+  color: #ffffff;
+  background: #24364f;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.room-submit-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.raid-status-shell {
+  display: grid;
+  gap: 18px;
+}
+
+.raid-status-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.raid-status-heading h2 {
+  margin: 0 0 5px;
+  font-size: 21px;
+}
+
+.raid-status-heading p {
+  margin: 0;
+  color: #66758b;
+  font-size: 14px;
+}
+
+.raid-status-player-list,
+.raid-status-character-list {
+  display: grid;
+  gap: 14px;
+}
+
+.raid-status-player {
+  overflow: hidden;
+  border: 1px solid #dfe4ec;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.raid-status-player > h3 {
+  margin: 0;
+  padding: 15px 18px;
+  border-bottom: 1px solid #e5e9f0;
+  background: #f7f9fc;
+  font-size: 16px;
+}
+
+.raid-status-character-list {
+  gap: 0;
+}
+
+.raid-status-character {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(320px, 2fr);
+  gap: 18px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.raid-status-character:last-child {
+  border-bottom: 0;
+}
+
+.raid-status-character-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.raid-status-character-title strong {
+  font-size: 15px;
+}
+
+.raid-status-character-title span,
+.raid-status-empty {
+  color: #768398;
+  font-size: 13px;
+}
+
+.raid-status-check-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.raid-status-check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 11px;
+  border: 1px solid #dce2eb;
+  border-radius: 8px;
+  color: #344258;
+  background: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.raid-status-check.completed {
+  border-color: #accfbd;
+  color: #3f6f56;
+  background: #eff8f3;
+  text-decoration: line-through;
+}
+
+.raid-status-check input {
+  width: 17px;
+  height: 17px;
+  accent-color: #3f805d;
 }
 
 .member-heading {
@@ -1148,7 +1409,8 @@ button:disabled {
 
 @media (max-width: 720px) {
   .member-shell,
-  .result-shell {
+  .result-shell,
+  .raid-status-shell {
     padding: 16px;
   }
 
@@ -1178,5 +1440,18 @@ button:disabled {
   .difficulty-buttons button {
     border-right: 0;
     border-bottom: 1px solid #d7dce5;
+  }
+
+  .room-gate-card {
+    padding: 24px 20px;
+  }
+
+  .raid-status-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .raid-status-character {
+    grid-template-columns: 1fr;
   }
 }
