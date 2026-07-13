@@ -89,6 +89,7 @@ const errorResponse = (error: unknown) => {
   if (error instanceof RaidGroupError) {
     return Response.json({ message: error.message }, { status: error.status });
   }
+  console.error("Raid group API error", error);
   return Response.json(
     { message: "서버 저장소를 처리하지 못했습니다." },
     { status: 500 },
