@@ -59,6 +59,9 @@ const RAID_FAMILIES = [
   { id: "cathedral", label: "성당" },
   { id: "finale", label: "종막" },
   { id: "act4", label: "4막" },
+  { id: "act3", label: "3막" },
+  { id: "act2", label: "2막" },
+  { id: "act1", label: "1막" },
 ] as const;
 
 export default function Home() {
@@ -1870,7 +1873,9 @@ function RaidFamilySelector({
           <div className="raid-family-row" key={family.id}>
             <div className="raid-family-label">
               <span>{family.label}</span>
-              {selected ? <small>{selected.gold.toLocaleString("ko-KR")}G</small> : null}
+              {selected?.gold ? (
+                <small>{selected.gold.toLocaleString("ko-KR")}G</small>
+              ) : null}
             </div>
             <div className="difficulty-buttons">
               {raids.map((raid) => (

@@ -13,12 +13,19 @@ export type CharacterInput = {
 
 export type RaidDefinition = {
   name: string;
-  family: "cathedral" | "act4" | "finale" | "serka";
+  family:
+    | "cathedral"
+    | "act1"
+    | "act2"
+    | "act3"
+    | "act4"
+    | "finale"
+    | "serka";
   variant: string;
   size: 4 | 8;
   dealerSlots: number;
   supportSlots: number;
-  gold: number;
+  gold?: number;
 };
 
 export type AssignedMember = {
@@ -88,6 +95,11 @@ export const RAID_DEFINITIONS: RaidDefinition[] = [
   { name: "세르카 노말", family: "serka", variant: "노말", size: 4, dealerSlots: 3, supportSlots: 1, gold: 32000 },
   { name: "세르카 하드", family: "serka", variant: "하드", size: 4, dealerSlots: 3, supportSlots: 1, gold: 44000 },
   { name: "세르카 나메", family: "serka", variant: "나이트메어", size: 4, dealerSlots: 3, supportSlots: 1, gold: 54000 },
+  { name: "3막 노말", family: "act3", variant: "노말", size: 8, dealerSlots: 6, supportSlots: 2 },
+  { name: "3막 하드", family: "act3", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2 },
+  { name: "2막 노말", family: "act2", variant: "노말", size: 8, dealerSlots: 6, supportSlots: 2 },
+  { name: "2막 하드", family: "act2", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2 },
+  { name: "1막 하드", family: "act1", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2 },
 ];
 
 export const RAID_LEVEL_PRESETS: Array<{ minLevel: number; raids: string[] }> = [
@@ -110,6 +122,18 @@ export const RAID_LEVEL_PRESETS: Array<{ minLevel: number; raids: string[] }> = 
   {
     minLevel: 1710,
     raids: ["성당 1단계", "4막 노말", "종막 노말", "세르카 노말"],
+  },
+  {
+    minLevel: 1700,
+    raids: ["성당 1단계", "4막 노말", "3막 하드"],
+  },
+  {
+    minLevel: 1690,
+    raids: ["3막 노말", "2막 하드", "1막 하드"],
+  },
+  {
+    minLevel: 1680,
+    raids: ["3막 노말", "2막 노말", "1막 하드"],
   },
 ];
 
