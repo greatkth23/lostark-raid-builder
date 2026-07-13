@@ -117,6 +117,7 @@ export const SUPPORT_CLASS_NAMES = [
   "바드",
   "홀리나이트",
   "도화가",
+  "발키리",
   "bard",
   "paladin",
   "artist",

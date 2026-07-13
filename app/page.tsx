@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   RAID_DEFINITIONS,
+  SUPPORT_CLASS_NAMES,
   buildRaidPlan,
   getAutoRaidsForLevel,
   inferRoleFromClassName,
@@ -59,9 +60,6 @@ const RAID_FAMILIES = [
   { id: "finale", label: "종막" },
   { id: "act4", label: "4막" },
 ] as const;
-
-const SUPPORT_CLASS_NAMES = ["도화가", "홀리나이트", "바드", "아티스트", "artist", "bard", "paladin"];
-
 
 export default function Home() {
   const [players, setPlayers] = useState<Player[]>([createPlayer(1)]);
@@ -1513,13 +1511,20 @@ function ExpeditionSettingsModal({
     patch: Partial<Expedition>,
   ) => void;
 }) {
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    onClose();
+    onSyncRoster(player.id, expedition.id);
+  };
+
   return (
     <div className="settings-modal-backdrop">
-      <section
+      <form
         className="settings-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="expedition-settings-title"
+        onSubmit={handleSubmit}
       >
         <div className="settings-modal-head">
           <div>
@@ -1576,16 +1581,12 @@ function ExpeditionSettingsModal({
         <div className="settings-modal-actions">
           <button
             className="dark-button"
-            type="button"
-            onClick={() => {
-              onClose();
-              onSyncRoster(player.id, expedition.id);
-            }}
+            type="submit"
           >
             완료
           </button>
         </div>
-      </section>
+      </form>
     </div>
   );
 }
