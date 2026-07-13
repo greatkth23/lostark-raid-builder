@@ -11,7 +11,7 @@ import { getRaidWeekKey } from "./raidWeek";
 
 const COOKIE_NAME = "lostark-raid-group-session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
-const PBKDF2_ITERATIONS = 120_000;
+const PBKDF2_ITERATIONS = 100_000;
 
 type RaidGroupRow = {
   id: string;
