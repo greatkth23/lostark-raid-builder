@@ -79,12 +79,15 @@ export default function Home() {
   const [pendingScrollPlayerId, setPendingScrollPlayerId] = useState("");
   const roomRef = useRef<RaidGroupRoom | null>(null);
   const raidWeekRef = useRef("");
+  const nameEditingRef = useRef(false);
   const pendingMutationsRef = useRef(0);
+  const snapshotRequestIdRef = useRef(0);
   const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const applySnapshot = useCallback(
     (snapshot: { room: RaidGroupRoom; players: Player[]; raidWeek: string }) => {
       const normalized = normalizePlayers(snapshot.players) ?? [];
+      snapshotRequestIdRef.current += 1;
       roomRef.current = snapshot.room;
       raidWeekRef.current = snapshot.raidWeek;
       setRoom(snapshot.room);
@@ -97,27 +100,47 @@ export default function Home() {
   const loadSharedState = useCallback(
     async (conditional = true) => {
       const currentRoom = roomRef.current;
-      if (!currentRoom || pendingMutationsRef.current > 0) return;
+      if (
+        !currentRoom ||
+        nameEditingRef.current ||
+        pendingMutationsRef.current > 0
+      ) {
+        return;
+      }
+      const requestId = ++snapshotRequestIdRef.current;
       const query = conditional
         ? `?since=${currentRoom.revision}&week=${encodeURIComponent(raidWeekRef.current)}`
         : "";
       const response = await fetch(`/api/raid-group${query}`, {
         cache: "no-store",
       });
+      if (requestId !== snapshotRequestIdRef.current) return;
       if (response.status === 204) return;
       if (response.status === 401) {
+        snapshotRequestIdRef.current += 1;
         roomRef.current = null;
         setRoom(null);
         return;
       }
       if (!response.ok) return;
-      applySnapshot(await response.json());
+      const snapshot = await response.json();
+      if (
+        requestId !== snapshotRequestIdRef.current ||
+        nameEditingRef.current ||
+        pendingMutationsRef.current > 0
+      ) {
+        return;
+      }
+      applySnapshot(snapshot);
     },
     [applySnapshot],
   );
 
   const queueMutation = useCallback(
     (operation: RaidGroupOperation) => {
+      // A polling response that started before this optimistic change must
+      // never be allowed to replace the newer local state.
+      snapshotRequestIdRef.current += 1;
       pendingMutationsRef.current += 1;
       mutationQueueRef.current = mutationQueueRef.current
         .catch(() => undefined)
@@ -172,6 +195,16 @@ export default function Home() {
       queueMutation(operation);
     },
     [queueMutation],
+  );
+
+  const handleNameEditingChange = useCallback(
+    (isEditing: boolean) => {
+      nameEditingRef.current = isEditing;
+      if (!isEditing && pendingMutationsRef.current === 0) {
+        void loadSharedState(false);
+      }
+    },
+    [loadSharedState],
   );
 
   const fingerprint = useMemo(() => JSON.stringify(players), [players]);
@@ -659,6 +692,7 @@ export default function Home() {
             onAddExpedition={addExpedition}
             onRemoveExpedition={removeExpedition}
             onUpdateExpedition={updateExpedition}
+            onNameEditingChange={handleNameEditingChange}
             onSyncRoster={syncRoster}
             onSyncAll={syncAllRosters}
             onResetAllRaids={resetAllRaids}
@@ -1057,6 +1091,7 @@ function PlayerEditor({
   onAddPlayer,
   onRemovePlayer,
   onUpdatePlayer,
+  onNameEditingChange,
   onAddExpedition,
   onRemoveExpedition,
   onUpdateExpedition,
@@ -1075,6 +1110,7 @@ function PlayerEditor({
   onAddPlayer: () => void;
   onRemovePlayer: (playerId: string) => void;
   onUpdatePlayer: (playerId: string, patch: Partial<Player>) => void;
+  onNameEditingChange: (isEditing: boolean) => void;
   onAddExpedition: (playerId: string) => void;
   onRemoveExpedition: (playerId: string, expeditionId: string) => void;
   onUpdateExpedition: (
@@ -1110,9 +1146,13 @@ function PlayerEditor({
   ) => void;
   onToggleCharacter: (characterId: string) => void;
 }) {
-  const [editingPlayers, setEditingPlayers] = useState<Set<string>>(new Set());
-  const [editingExpeditions, setEditingExpeditions] = useState<Set<string>>(
-    new Set(),
+  const [editingPlayers, setEditingPlayers] = useState<
+    Map<string, { initialValue: string; value: string }>
+  >(new Map());
+  const [editingExpeditions, setEditingExpeditions] = useState<
+    Map<string, { initialValue: string; value: string }>
+  >(
+    new Map(),
   );
   const [collapsedPlayers, setCollapsedPlayers] = useState<Set<string>>(new Set());
   const [settingsTarget, setSettingsTarget] = useState<{
@@ -1120,25 +1160,77 @@ function PlayerEditor({
     expeditionId: string;
   } | null>(null);
 
-  const startEditingPlayer = (playerId: string) => {
-    setEditingPlayers((current) => new Set(current).add(playerId));
+  const hasActiveNameEdit =
+    editingPlayers.size > 0 || editingExpeditions.size > 0;
+
+  useEffect(() => {
+    onNameEditingChange(hasActiveNameEdit);
+  }, [hasActiveNameEdit, onNameEditingChange]);
+
+  useEffect(
+    () => () => {
+      onNameEditingChange(false);
+    },
+    [onNameEditingChange],
+  );
+
+  const startEditingPlayer = (playerId: string, name: string) => {
+    setEditingPlayers((current) =>
+      new Map(current).set(playerId, {
+        initialValue: name,
+        value: name,
+      }),
+    );
   };
 
-  const stopEditingPlayer = (playerId: string) => {
+  const updateEditingPlayer = (playerId: string, value: string) => {
     setEditingPlayers((current) => {
-      const next = new Set(current);
+      const draft = current.get(playerId);
+      if (!draft) return current;
+      return new Map(current).set(playerId, { ...draft, value });
+    });
+  };
+
+  const stopEditingPlayer = (playerId: string, value: string) => {
+    const draft = editingPlayers.get(playerId);
+    if (draft && value !== draft.initialValue) {
+      onUpdatePlayer(playerId, { name: value });
+    }
+    setEditingPlayers((current) => {
+      const next = new Map(current);
       next.delete(playerId);
       return next;
     });
   };
 
-  const startEditingExpedition = (expeditionId: string) => {
-    setEditingExpeditions((current) => new Set(current).add(expeditionId));
+  const startEditingExpedition = (expeditionId: string, name: string) => {
+    setEditingExpeditions((current) =>
+      new Map(current).set(expeditionId, {
+        initialValue: name,
+        value: name,
+      }),
+    );
   };
 
-  const stopEditingExpedition = (expeditionId: string) => {
+  const updateEditingExpedition = (expeditionId: string, value: string) => {
     setEditingExpeditions((current) => {
-      const next = new Set(current);
+      const draft = current.get(expeditionId);
+      if (!draft) return current;
+      return new Map(current).set(expeditionId, { ...draft, value });
+    });
+  };
+
+  const stopEditingExpedition = (
+    playerId: string,
+    expeditionId: string,
+    value: string,
+  ) => {
+    const draft = editingExpeditions.get(expeditionId);
+    if (draft && value !== draft.initialValue) {
+      onUpdateExpedition(playerId, expeditionId, { name: value });
+    }
+    setEditingExpeditions((current) => {
+      const next = new Map(current);
       next.delete(expeditionId);
       return next;
     });
@@ -1177,21 +1269,24 @@ function PlayerEditor({
       <div className="player-stack">
         {players.map((player) => {
           const playerCollapsed = collapsedPlayers.has(player.id);
+          const playerNameDraft = editingPlayers.get(player.id);
 
           return (
             <article className="player-card" id={`player-${player.id}`} key={player.id}>
               <div className="player-card-head">
                 <div className="player-name-line">
                   <span className="user-circle-icon" aria-hidden="true" />
-                  {editingPlayers.has(player.id) ? (
+                  {playerNameDraft ? (
                     <input
                       aria-label="플레이어명"
                       autoFocus
                       className="plain-title-input"
-                      value={player.name}
-                      onBlur={() => stopEditingPlayer(player.id)}
+                      value={playerNameDraft.value}
+                      onBlur={(event) =>
+                        stopEditingPlayer(player.id, event.currentTarget.value)
+                      }
                       onChange={(event) =>
-                        onUpdatePlayer(player.id, { name: event.target.value })
+                        updateEditingPlayer(player.id, event.target.value)
                       }
                       onKeyDown={(event) => {
                         if (event.key === "Enter" || event.key === "Escape") {
@@ -1206,7 +1301,7 @@ function PlayerEditor({
                     className="icon-button edit-icon-button"
                     type="button"
                     aria-label="플레이어명 수정"
-                    onClick={() => startEditingPlayer(player.id)}
+                    onClick={() => startEditingPlayer(player.id, player.name)}
                   >
                     ✎
                   </button>
@@ -1274,7 +1369,6 @@ function PlayerEditor({
                         onSyncRoster={onSyncRoster}
                         onToggleCharacter={onToggleCharacter}
                         onToggleRaid={onToggleRaid}
-                        onUpdateExpedition={onUpdateExpedition}
                         onOpenSettings={() =>
                           setSettingsTarget({
                             playerId: player.id,
@@ -1282,8 +1376,19 @@ function PlayerEditor({
                           })
                         }
                         isEditingName={editingExpeditions.has(expedition.id)}
-                        onStartEditName={() => startEditingExpedition(expedition.id)}
-                        onStopEditName={() => stopEditingExpedition(expedition.id)}
+                        nameDraft={
+                          editingExpeditions.get(expedition.id)?.value ??
+                          expedition.name
+                        }
+                        onChangeNameDraft={(value) =>
+                          updateEditingExpedition(expedition.id, value)
+                        }
+                        onStartEditName={() =>
+                          startEditingExpedition(expedition.id, expedition.name)
+                        }
+                        onStopEditName={(value) =>
+                          stopEditingExpedition(player.id, expedition.id, value)
+                        }
                       />
                     ))}
                   </div>
@@ -1318,23 +1423,25 @@ function ExpeditionBlock({
   expandedCharacters,
   isEditingName,
   isSyncing,
+  nameDraft,
   onRestoreCharacter,
   onRemoveCharacter,
   onRemoveExpedition,
   onSetRole,
   onOpenSettings,
+  onChangeNameDraft,
   onStartEditName,
   onStopEditName,
   onSyncRoster,
   onToggleCharacter,
   onToggleRaid,
-  onUpdateExpedition,
 }: {
   player: Player;
   expedition: Expedition;
   expandedCharacters: Set<string>;
   isEditingName: boolean;
   isSyncing: boolean;
+  nameDraft: string;
   onRestoreCharacter: (
     playerId: string,
     expeditionId: string,
@@ -1353,8 +1460,9 @@ function ExpeditionBlock({
     role: Role,
   ) => void;
   onOpenSettings: () => void;
+  onChangeNameDraft: (value: string) => void;
   onStartEditName: () => void;
-  onStopEditName: () => void;
+  onStopEditName: (value: string) => void;
   onSyncRoster: (playerId: string, expeditionId: string) => void;
   onToggleCharacter: (characterId: string) => void;
   onToggleRaid: (
@@ -1363,11 +1471,6 @@ function ExpeditionBlock({
     characterId: string,
     raidName: string,
     checked: boolean,
-  ) => void;
-  onUpdateExpedition: (
-    playerId: string,
-    expeditionId: string,
-    patch: Partial<Expedition>,
   ) => void;
 }) {
   const [restoreOpen, setRestoreOpen] = useState(false);
@@ -1383,13 +1486,9 @@ function ExpeditionBlock({
                 aria-label="원정대 별칭"
                 autoFocus
                 className="expedition-name-input"
-                value={expedition.name}
-                onBlur={onStopEditName}
-                onChange={(event) =>
-                  onUpdateExpedition(player.id, expedition.id, {
-                    name: event.target.value,
-                  })
-                }
+                value={nameDraft}
+                onBlur={(event) => onStopEditName(event.currentTarget.value)}
+                onChange={(event) => onChangeNameDraft(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === "Escape") {
                     event.currentTarget.blur();
