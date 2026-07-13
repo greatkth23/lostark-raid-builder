@@ -393,7 +393,7 @@ button:disabled {
 
 .raid-status-check-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1405,6 +1405,10 @@ button:disabled {
     grid-column: 4;
     grid-row: 1;
   }
+
+  .raid-status-check-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -1452,6 +1456,10 @@ button:disabled {
   }
 
   .raid-status-character {
+    grid-template-columns: 1fr;
+  }
+
+  .raid-status-check-list {
     grid-template-columns: 1fr;
   }
 }
