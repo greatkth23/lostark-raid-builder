@@ -1,3 +1,22 @@
+import {
+  RAID_DEFINITIONS,
+  getAutoRaidsForLevel,
+  getExclusiveRaidNames,
+  getGoldRecommendedRaidNames,
+  getRaidDefinition,
+  type GoldPreference,
+  type RaidDefinition,
+} from "./raidCatalog";
+
+export {
+  RAID_DEFINITIONS,
+  getAutoRaidsForLevel,
+  getExclusiveRaidNames,
+  getGoldRecommendedRaidNames,
+  getRaidDefinition,
+};
+export type { GoldPreference, RaidDefinition };
+
 export type Role = "dealer" | "support";
 
 export type CharacterInput = {
@@ -9,23 +28,6 @@ export type CharacterInput = {
   className: string;
   role: Role;
   selectedRaids: string[];
-};
-
-export type RaidDefinition = {
-  name: string;
-  family:
-    | "cathedral"
-    | "act1"
-    | "act2"
-    | "act3"
-    | "act4"
-    | "finale"
-    | "serka";
-  variant: string;
-  size: 4 | 8;
-  dealerSlots: number;
-  supportSlots: number;
-  gold: number;
 };
 
 export type AssignedMember = {
@@ -84,59 +86,6 @@ type PlayerAssignmentOption = {
   supportGroups: number[];
 };
 
-export const RAID_DEFINITIONS: RaidDefinition[] = [
-  { name: "성당 1단계", family: "cathedral", variant: "1단계", size: 4, dealerSlots: 3, supportSlots: 1, gold: 30000 },
-  { name: "성당 2단계", family: "cathedral", variant: "2단계", size: 4, dealerSlots: 3, supportSlots: 1, gold: 40000 },
-  { name: "성당 3단계", family: "cathedral", variant: "3단계", size: 4, dealerSlots: 3, supportSlots: 1, gold: 50000 },
-  { name: "4막 노말", family: "act4", variant: "노말", size: 8, dealerSlots: 6, supportSlots: 2, gold: 27000 },
-  { name: "4막 하드", family: "act4", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2, gold: 38000 },
-  { name: "종막 노말", family: "finale", variant: "노말", size: 8, dealerSlots: 6, supportSlots: 2, gold: 32000 },
-  { name: "종막 하드", family: "finale", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2, gold: 48000 },
-  { name: "세르카 노말", family: "serka", variant: "노말", size: 4, dealerSlots: 3, supportSlots: 1, gold: 32000 },
-  { name: "세르카 하드", family: "serka", variant: "하드", size: 4, dealerSlots: 3, supportSlots: 1, gold: 44000 },
-  { name: "세르카 나메", family: "serka", variant: "나이트메어", size: 4, dealerSlots: 3, supportSlots: 1, gold: 54000 },
-  { name: "3막 노말", family: "act3", variant: "노말", size: 8, dealerSlots: 6, supportSlots: 2, gold: 21000 },
-  { name: "3막 하드", family: "act3", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2, gold: 27000 },
-  { name: "2막 노말", family: "act2", variant: "노말", size: 8, dealerSlots: 6, supportSlots: 2, gold: 16500 },
-  { name: "2막 하드", family: "act2", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2, gold: 23000 },
-  { name: "1막 하드", family: "act1", variant: "하드", size: 8, dealerSlots: 6, supportSlots: 2, gold: 18000 },
-];
-
-export const RAID_LEVEL_PRESETS: Array<{ minLevel: number; raids: string[] }> = [
-  {
-    minLevel: 1750,
-    raids: ["성당 3단계", "4막 하드", "종막 하드", "세르카 나메"],
-  },
-  {
-    minLevel: 1740,
-    raids: ["성당 2단계", "4막 하드", "종막 하드", "세르카 나메"],
-  },
-  {
-    minLevel: 1730,
-    raids: ["성당 2단계", "4막 하드", "종막 하드", "세르카 하드"],
-  },
-  {
-    minLevel: 1720,
-    raids: ["성당 2단계", "4막 하드", "종막 노말", "세르카 노말"],
-  },
-  {
-    minLevel: 1710,
-    raids: ["성당 1단계", "4막 노말", "종막 노말", "세르카 노말"],
-  },
-  {
-    minLevel: 1700,
-    raids: ["성당 1단계", "4막 노말", "3막 하드"],
-  },
-  {
-    minLevel: 1690,
-    raids: ["3막 노말", "2막 하드", "1막 하드"],
-  },
-  {
-    minLevel: 1680,
-    raids: ["3막 노말", "2막 노말", "1막 하드"],
-  },
-];
-
 export const SUPPORT_CLASS_NAMES = [
   "바드",
   "홀리나이트",
@@ -149,26 +98,6 @@ export const SUPPORT_CLASS_NAMES = [
   "서폿",
   "폿",
 ];
-
-export const getRaidDefinition = (raidName: string) =>
-  RAID_DEFINITIONS.find((raid) => raid.name === raidName);
-
-export const getExclusiveRaidNames = (raidName: string) => {
-  const raid = getRaidDefinition(raidName);
-  if (!raid) {
-    return [];
-  }
-
-  return RAID_DEFINITIONS.filter(
-    (candidate) =>
-      candidate.family === raid.family && candidate.name !== raid.name,
-  ).map((candidate) => candidate.name);
-};
-
-export const getAutoRaidsForLevel = (itemLevel: number) => {
-  const preset = RAID_LEVEL_PRESETS.find((entry) => itemLevel >= entry.minLevel);
-  return preset ? [...preset.raids] : [];
-};
 
 export const inferRoleFromClassName = (className: string): Role | null => {
   const normalized = className.trim().toLowerCase();
@@ -208,6 +137,12 @@ export const buildRaidPlan = (characters: CharacterInput[]): RaidPlanResult => {
       const raid = getRaidDefinition(raidName);
       if (!raid) {
         warnings.push(`${character.characterName}: 알 수 없는 레이드 '${raidName}'을 제외했습니다.`);
+        continue;
+      }
+      if (character.itemLevel < raid.minItemLevel) {
+        warnings.push(
+          `${character.characterName}: ${raidName} 입장 레벨이 부족해 제외했습니다.`,
+        );
         continue;
       }
 

@@ -7,13 +7,17 @@ import {
   useRef,
   useState,
 } from "react";
+import type { CSSProperties } from "react";
 import {
   RAID_DEFINITIONS,
   SUPPORT_CLASS_NAMES,
   buildRaidPlan,
   getAutoRaidsForLevel,
+  getGoldRecommendedRaidNames,
+  getRaidDefinition,
   inferRoleFromClassName,
   type CharacterInput,
+  type GoldPreference,
   type RaidGroup,
   type RaidPlanResult,
   type Role,
@@ -54,15 +58,42 @@ const TABS: Array<{ id: TabKey; label: string }> = [
   { id: "results", label: "자동구성 결과" },
 ];
 
-const RAID_FAMILIES = [
-  { id: "serka", label: "세르카" },
-  { id: "cathedral", label: "성당" },
-  { id: "finale", label: "종막" },
-  { id: "act4", label: "4막" },
-  { id: "act3", label: "3막" },
-  { id: "act2", label: "2막" },
-  { id: "act1", label: "1막" },
-] as const;
+const RAID_FAMILIES = Array.from(
+  new Map(RAID_DEFINITIONS.map((raid) => [raid.family, raid.family])),
+).map(([id, label]) => ({ id, label }));
+
+const ICON_PATHS = {
+  add: "/icons/add.svg",
+  chevron: "/icons/chevron.svg",
+  close: "/icons/close.svg",
+  dealer: "/icons/dealer.svg",
+  edit: "/icons/edit.svg",
+  gold: "/icons/gold.svg",
+  refresh: "/icons/refresh.svg",
+  settings: "/icons/settings.svg",
+  sparkle: "/icons/sparkle.svg",
+  support: "/icons/support.svg",
+  trash: "/icons/trash.svg",
+  user: "/icons/user.svg",
+} as const;
+
+type IconName = keyof typeof ICON_PATHS;
+
+function CoolIcon({
+  name,
+  className = "",
+}: {
+  name: IconName;
+  className?: string;
+}) {
+  return (
+    <span
+      className={`cool-icon ${className}`.trim()}
+      style={{ "--icon-url": `url(${ICON_PATHS[name]})` } as CSSProperties}
+      aria-hidden="true"
+    />
+  );
+}
 
 export default function Home() {
   const [players, setPlayers] = useState<Player[]>([createPlayer(1)]);
@@ -414,6 +445,21 @@ export default function Home() {
     });
   };
 
+  const setGoldPreference = (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    preference: GoldPreference,
+  ) => {
+    commitOperation({
+      type: "character.goldPreference",
+      playerId,
+      expeditionId,
+      characterId,
+      preference,
+    });
+  };
+
   const toggleRaid = (
     playerId: string,
     expeditionId: string,
@@ -650,10 +696,10 @@ export default function Home() {
             <button
               className="gear-button"
               type="button"
-              aria-label="API 설정"
-              onClick={() => setApiSettingsOpen(true)}
-            >
-              <span aria-hidden="true">⚙</span>
+            aria-label="API 설정"
+            onClick={() => setApiSettingsOpen(true)}
+          >
+              <CoolIcon name="settings" />
             </button>
           </div>
         </header>
@@ -719,6 +765,7 @@ export default function Home() {
           <RaidStatusPanel
             players={players}
             raidWeek={raidWeek}
+            onSetGoldPreference={setGoldPreference}
             onSetCompletion={setRaidCompletion}
             onReset={resetRaidCompletions}
           />
@@ -882,11 +929,18 @@ function RaidGroupGate({
 function RaidStatusPanel({
   players,
   raidWeek,
+  onSetGoldPreference,
   onSetCompletion,
   onReset,
 }: {
   players: Player[];
   raidWeek: string;
+  onSetGoldPreference: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    preference: GoldPreference,
+  ) => void;
   onSetCompletion: (
     playerId: string,
     expeditionId: string,
@@ -926,64 +980,150 @@ function RaidStatusPanel({
         <div className="empty-state">등록된 캐릭터가 없습니다.</div>
       ) : (
         <div className="raid-status-player-list">
-          {players.map((player) => (
-            <article className="raid-status-player" key={player.id}>
-              <h3>{player.name}</h3>
-              <div className="raid-status-character-list">
-                {player.expeditions.flatMap((expedition) =>
-                  expedition.characters.map((character) => (
-                    <div className="raid-status-character" key={character.id}>
-                      <div className="raid-status-character-title">
-                        <strong>{character.name || "이름 없는 캐릭터"}</strong>
-                        <span>
-                          {character.className || "직업 미입력"} · {expedition.name}
-                        </span>
-                      </div>
-                      <div className="raid-status-check-list">
-                        {character.selectedRaids.length ? (
-                          character.selectedRaids.map((raidName) => {
-                            const completed =
-                              character.raidCompletions[raidName] === raidWeek;
-                            return (
-                              <label
-                                className={
-                                  completed
-                                    ? "raid-status-check completed"
-                                    : "raid-status-check"
-                                }
-                                key={raidName}
+          {players.map((player) => {
+            const totals = getPlayerCompletedGold(player, raidWeek);
+            return (
+              <article className="raid-status-player" key={player.id}>
+                <div className="raid-status-player-heading">
+                  <h3>{player.name}</h3>
+                  <span
+                    className="raid-status-gold-total"
+                    aria-label={`완료 레이드 골드 합계 ${totals.total.toLocaleString("ko-KR")}`}
+                  >
+                    <CoolIcon name="gold" />
+                    {totals.total.toLocaleString("ko-KR")} (
+                    {totals.tradable.toLocaleString("ko-KR")} + {totals.bound.toLocaleString("ko-KR")})
+                  </span>
+                </div>
+                <div className="raid-status-character-list">
+                  {player.expeditions.flatMap((expedition) =>
+                    expedition.characters.map((character) => {
+                      const recommendedRaids = new Set(
+                        getGoldRecommendedRaidNames(
+                          character.selectedRaids,
+                          character.goldPreference,
+                        ),
+                      );
+                      return (
+                        <div className="raid-status-character" key={character.id}>
+                          <div className="raid-status-character-title">
+                            <div className="raid-status-character-name-row">
+                              <strong>{character.name || "이름 없는 캐릭터"}</strong>
+                              <span
+                                className="gold-preference-toggle"
+                                aria-label="골드 추천 기준"
                               >
-                                <span>{raidName}</span>
-                                <input
-                                  type="checkbox"
-                                  checked={completed}
-                                  onChange={(event) =>
-                                    onSetCompletion(
+                                <button
+                                  type="button"
+                                  className={
+                                    character.goldPreference === "bound" ? "active" : ""
+                                  }
+                                  aria-pressed={character.goldPreference === "bound"}
+                                  onClick={() =>
+                                    onSetGoldPreference(
                                       player.id,
                                       expedition.id,
                                       character.id,
-                                      raidName,
-                                      event.target.checked,
+                                      "bound",
                                     )
                                   }
-                                  aria-label={`${character.name} ${raidName} 완료`}
-                                />
-                              </label>
-                            );
-                          })
-                        ) : (
-                          <span className="raid-status-empty">선택된 레이드 없음</span>
-                        )}
-                      </div>
-                    </div>
-                  )),
-                )}
-              </div>
-            </article>
-          ))}
+                                >
+                                  귀속
+                                </button>
+                                <button
+                                  type="button"
+                                  className={
+                                    character.goldPreference === "tradable" ? "active" : ""
+                                  }
+                                  aria-pressed={character.goldPreference === "tradable"}
+                                  onClick={() =>
+                                    onSetGoldPreference(
+                                      player.id,
+                                      expedition.id,
+                                      character.id,
+                                      "tradable",
+                                    )
+                                  }
+                                >
+                                  유통
+                                </button>
+                              </span>
+                            </div>
+                            <span>
+                              {character.className || "직업 미입력"} · {expedition.name}
+                            </span>
+                          </div>
+                          <div className="raid-status-check-list">
+                            {character.selectedRaids.length ? (
+                              character.selectedRaids.map((raidName) => {
+                                const raid = getRaidDefinition(raidName);
+                                if (!raid) return null;
+                                const completed =
+                                  character.raidCompletions[raidName] === raidWeek;
+                                const recommended = recommendedRaids.has(raidName);
+                                return (
+                                  <label
+                                    className={`raid-status-check${completed ? " completed" : ""}${recommended ? " recommended" : ""}`}
+                                    key={raidName}
+                                  >
+                                    <span className="raid-status-check-copy">
+                                      <span>{raidName}</span>
+                                      <small>
+                                        <CoolIcon name="gold" />
+                                        {raid.gold.toLocaleString("ko-KR")} (
+                                        {raid.tradableGold.toLocaleString("ko-KR")} + {raid.boundGold.toLocaleString("ko-KR")})
+                                      </small>
+                                    </span>
+                                    <input
+                                      type="checkbox"
+                                      checked={completed}
+                                      onChange={(event) =>
+                                        onSetCompletion(
+                                          player.id,
+                                          expedition.id,
+                                          character.id,
+                                          raidName,
+                                          event.target.checked,
+                                        )
+                                      }
+                                      aria-label={`${character.name} ${raidName} 완료`}
+                                    />
+                                  </label>
+                                );
+                              })
+                            ) : (
+                              <span className="raid-status-empty">선택된 레이드 없음</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }),
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </section>
+  );
+}
+
+function getPlayerCompletedGold(player: Player, raidWeek: string) {
+  return player.expeditions.reduce(
+    (playerTotals, expedition) =>
+      expedition.characters.reduce((characterTotals, character) => {
+        character.selectedRaids.forEach((raidName) => {
+          if (character.raidCompletions[raidName] !== raidWeek) return;
+          const raid = getRaidDefinition(raidName);
+          if (!raid) return;
+          characterTotals.total += raid.gold;
+          characterTotals.tradable += raid.tradableGold;
+          characterTotals.bound += raid.boundGold;
+        });
+        return characterTotals;
+      }, playerTotals),
+    { total: 0, tradable: 0, bound: 0 },
   );
 }
 
@@ -1015,7 +1155,7 @@ function ApiSettingsModal({
             aria-label="API 설정 닫기"
             onClick={onClose}
           >
-            ×
+            <CoolIcon name="close" />
           </button>
         </div>
 
@@ -1070,6 +1210,7 @@ function mergeRosterIntoExpedition(
       combatPower: rosterCharacter.combatPower,
       className: rosterCharacter.className,
       role: previous?.roleEdited ? previous.role : inferredRole,
+      goldPreference: previous?.goldPreference ?? "tradable",
       selectedRaids: previous?.raidsEdited
         ? previous.selectedRaids
         : getAutoRaidsForLevel(rosterCharacter.itemLevel),
@@ -1265,7 +1406,7 @@ function PlayerEditor({
       <div className="member-heading">
         <div className="member-title">멤버 목록</div>
         <button className="dark-button" type="button" onClick={onAddPlayer}>
-          + 플레이어 추가
+          <CoolIcon name="add" /> 플레이어 추가
         </button>
       </div>
 
@@ -1278,7 +1419,7 @@ function PlayerEditor({
             <article className="player-card" id={`player-${player.id}`} key={player.id}>
               <div className="player-card-head">
                 <div className="player-name-line">
-                  <span className="user-circle-icon" aria-hidden="true" />
+                  <CoolIcon name="user" className="user-circle-icon" />
                   {playerNameDraft ? (
                     <input
                       aria-label="플레이어명"
@@ -1306,7 +1447,7 @@ function PlayerEditor({
                     aria-label="플레이어명 수정"
                     onClick={() => startEditingPlayer(player.id, player.name)}
                   >
-                    ✎
+                    <CoolIcon name="edit" />
                   </button>
                 </div>
                 <div className="player-head-right">
@@ -1317,9 +1458,9 @@ function PlayerEditor({
                     onClick={() => toggleCollapsedPlayer(player.id)}
                   >
                     <span>캐릭터</span>
-                    <span
+                    <CoolIcon
+                      name="chevron"
                       className={`fold-icon inline ${playerCollapsed ? "" : "expanded"}`}
-                      aria-hidden="true"
                     />
                   </button>
                 </div>
@@ -1331,21 +1472,21 @@ function PlayerEditor({
               >
                   <div className="player-command-row">
                     <button className="ghost-button" type="button" onClick={onSyncAll}>
-                      ↻ 전체 정보 업데이트
+                      <CoolIcon name="refresh" /> 전체 정보 업데이트
                     </button>
                     <button
                       className="ghost-button"
                       type="button"
                       onClick={onResetAllRaids}
                     >
-                      ✨ 레이드 자동 등록
+                      <CoolIcon name="sparkle" /> 레이드 자동 등록
                     </button>
                     <button
                       className="dark-button"
                       type="button"
                       onClick={() => onAddExpedition(player.id)}
                     >
-                      + 원정대 추가
+                      <CoolIcon name="add" /> 원정대 추가
                     </button>
                     <button
                       className="danger-text-button"
@@ -1403,7 +1544,7 @@ function PlayerEditor({
 
       <div className="member-bottom-actions">
         <button className="dark-button" type="button" onClick={onAddPlayer}>
-          + 플레이어 추가
+          <CoolIcon name="add" /> 플레이어 추가
         </button>
       </div>
 
@@ -1507,7 +1648,7 @@ function ExpeditionBlock({
               aria-label="원정대 별칭 수정"
               onClick={onStartEditName}
             >
-              ✎
+              <CoolIcon name="edit" />
             </button>
           </div>
           <div className="expedition-meta">
@@ -1526,21 +1667,21 @@ function ExpeditionBlock({
             onClick={() => onSyncRoster(player.id, expedition.id)}
             disabled={isSyncing}
           >
-            ↻ {isSyncing ? "동기화 중" : "동기화"}
+            <CoolIcon name="refresh" /> {isSyncing ? "동기화 중" : "동기화"}
           </button>
           <button
             className="ghost-button"
             type="button"
             onClick={onOpenSettings}
           >
-            ⚙ 원정대 설정
+            <CoolIcon name="settings" /> 원정대 설정
           </button>
           <button
             className="danger-text-button"
             type="button"
             onClick={() => onRemoveExpedition(player.id, expedition.id)}
           >
-            🗑 삭제
+            <CoolIcon name="trash" /> 삭제
           </button>
         </div>
       </div>
@@ -1570,7 +1711,7 @@ function ExpeditionBlock({
               onClick={() => setRestoreOpen((current) => !current)}
               disabled={!restorableCharacters.length}
             >
-              + 캐릭터 추가
+              <CoolIcon name="add" /> 캐릭터 추가
             </button>
             {restoreOpen ? (
               <div className="restore-character-menu">
@@ -1639,7 +1780,7 @@ function ExpeditionSettingsModal({
             aria-label="설정 닫기"
             onClick={onClose}
           >
-            ×
+            <CoolIcon name="close" />
           </button>
         </div>
 
@@ -1743,9 +1884,9 @@ function CharacterRow({
           }
         }}
       >
-        <span
-          className={`role-icon ${character.role === "support" ? "shield" : "sword"}`}
-          aria-hidden="true"
+        <CoolIcon
+          name={character.role === "support" ? "support" : "dealer"}
+          className="role-icon"
         />
         <div className="character-title-cell">
           <span className="character-name-text">{character.name || "캐릭터명"}</span>
@@ -1798,7 +1939,7 @@ function CharacterRow({
             onRemoveCharacter(player.id, expedition.id, character.id);
           }}
         >
-          ×
+          <CoolIcon name="close" />
         </button>
         <button
           className="fold-button"
@@ -1810,7 +1951,10 @@ function CharacterRow({
             onToggleCharacter(character.id);
           }}
         >
-          <span className={`fold-icon ${expanded ? "expanded" : ""}`} aria-hidden="true" />
+          <CoolIcon
+            name="chevron"
+            className={`fold-icon ${expanded ? "expanded" : ""}`}
+          />
         </button>
       </div>
 
@@ -1861,6 +2005,9 @@ function RaidFamilySelector({
     );
     return { family, raids, selected };
   }).filter((entry) => !entry.selected);
+  const hasEligibleHiddenRaid = hiddenFamilies.some(({ raids }) =>
+    raids.some((raid) => character.itemLevel >= raid.minItemLevel),
+  );
 
   const toggleSelectedRaid = (raidName: string, checked: boolean) => {
     onToggleRaid(player.id, expedition.id, character.id, raidName, checked);
@@ -1876,23 +2023,28 @@ function RaidFamilySelector({
               {selected ? <small>{selected.gold.toLocaleString("ko-KR")}G</small> : null}
             </div>
             <div className="difficulty-buttons">
-              {raids.map((raid) => (
-                <button
-                  className={
-                    character.selectedRaids.includes(raid.name) ? "selected" : ""
-                  }
-                  key={raid.name}
-                  type="button"
-                  onClick={() =>
-                    toggleSelectedRaid(
-                      raid.name,
-                      !character.selectedRaids.includes(raid.name),
-                    )
-                  }
-                >
-                  {raid.variant}
-                </button>
-              ))}
+              {raids.map((raid) => {
+                const locked = character.itemLevel < raid.minItemLevel;
+                return (
+                  <button
+                    className={
+                      character.selectedRaids.includes(raid.name) ? "selected" : ""
+                    }
+                    key={raid.name}
+                    type="button"
+                    disabled={locked}
+                    title={locked ? `입장 레벨 ${raid.minItemLevel} 필요` : undefined}
+                    onClick={() =>
+                      toggleSelectedRaid(
+                        raid.name,
+                        !character.selectedRaids.includes(raid.name),
+                      )
+                    }
+                  >
+                    {raid.variant}
+                  </button>
+                );
+              })}
             </div>
             {selected ? (
               <button
@@ -1903,7 +2055,7 @@ function RaidFamilySelector({
                 }
                 aria-label={`${family.label} 레이드 삭제`}
               >
-                ×
+                <CoolIcon name="close" />
               </button>
             ) : null}
           </div>
@@ -1916,18 +2068,23 @@ function RaidFamilySelector({
               <div className="raid-add-row" key={family.id}>
                 <span className="raid-add-label">{family.label}</span>
                 <div className="difficulty-buttons add-mode">
-                  {raids.map((raid) => (
-                    <button
-                      key={raid.name}
-                      type="button"
-                      onClick={() => {
-                        toggleSelectedRaid(raid.name, true);
-                        setAddingRaid(false);
-                      }}
-                    >
-                      {raid.variant}
-                    </button>
-                  ))}
+                  {raids.map((raid) => {
+                    const locked = character.itemLevel < raid.minItemLevel;
+                    return (
+                      <button
+                        key={raid.name}
+                        type="button"
+                        disabled={locked}
+                        title={locked ? `입장 레벨 ${raid.minItemLevel} 필요` : undefined}
+                        onClick={() => {
+                          toggleSelectedRaid(raid.name, true);
+                          setAddingRaid(false);
+                        }}
+                      >
+                        {raid.variant}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             ))
@@ -1940,9 +2097,9 @@ function RaidFamilySelector({
         className="add-raid-button raid-add-button"
         type="button"
         onClick={() => setAddingRaid((current) => !current)}
-        disabled={!hiddenFamilies.length}
+        disabled={!hasEligibleHiddenRaid}
       >
-        + 레이드 추가
+        <CoolIcon name="add" /> 레이드 추가
       </button>
     </div>
   );

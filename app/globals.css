@@ -37,6 +37,23 @@ button:disabled {
   opacity: 0.48;
 }
 
+.cool-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  background: currentColor;
+  mask-image: var(--icon-url);
+  mask-position: center;
+  mask-repeat: no-repeat;
+  mask-size: contain;
+  vertical-align: -0.12em;
+  -webkit-mask-image: var(--icon-url);
+  -webkit-mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-size: contain;
+}
+
 .app-header {
   display: flex;
   align-items: flex-end;
@@ -351,12 +368,37 @@ button:disabled {
   background: #ffffff;
 }
 
-.raid-status-player > h3 {
-  margin: 0;
+.raid-status-player-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
   padding: 15px 18px;
   border-bottom: 1px solid #e5e9f0;
   background: #f7f9fc;
+}
+
+.raid-status-player-heading h3 {
+  margin: 0;
   font-size: 16px;
+}
+
+.raid-status-gold-total {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: #8a5a00;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  text-align: right;
+}
+
+.raid-status-gold-total .cool-icon {
+  width: 17px;
+  height: 17px;
+  color: #c68a17;
 }
 
 .raid-status-character-list {
@@ -365,7 +407,7 @@ button:disabled {
 
 .raid-status-character {
   display: grid;
-  grid-template-columns: minmax(180px, 0.8fr) minmax(320px, 2fr);
+  grid-template-columns: minmax(250px, 0.9fr) minmax(320px, 2fr);
   gap: 18px;
   padding: 16px 18px;
   border-bottom: 1px solid #edf0f4;
@@ -385,10 +427,46 @@ button:disabled {
   font-size: 15px;
 }
 
-.raid-status-character-title span,
+.raid-status-character-title > span,
 .raid-status-empty {
   color: #768398;
   font-size: 13px;
+}
+
+.raid-status-character-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.gold-preference-toggle {
+  display: inline-grid;
+  grid-auto-flow: column;
+  overflow: hidden;
+  border: 1px solid #d8dee8;
+  border-radius: 999px;
+  background: #ffffff;
+}
+
+.gold-preference-toggle button {
+  min-height: 24px;
+  border: 0;
+  border-right: 1px solid #d8dee8;
+  background: transparent;
+  padding: 2px 8px;
+  color: #69778c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.gold-preference-toggle button:last-child {
+  border-right: 0;
+}
+
+.gold-preference-toggle button.active {
+  background: #2f3f57;
+  color: #ffffff;
 }
 
 .raid-status-check-list {
@@ -416,13 +494,51 @@ button:disabled {
   border-color: #accfbd;
   color: #3f6f56;
   background: #eff8f3;
+}
+
+.raid-status-check.completed .raid-status-check-copy {
   text-decoration: line-through;
+}
+
+.raid-status-check-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.raid-status-check-copy > span {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.raid-status-check-copy small {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #8a6726;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.raid-status-check-copy .cool-icon {
+  width: 12px;
+  height: 12px;
 }
 
 .raid-status-check input {
   width: 17px;
   height: 17px;
+  flex: 0 0 auto;
   accent-color: #3f805d;
+}
+
+.raid-status-check.recommended input {
+  outline: 3px solid rgb(224 170 49 / 35%);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px #d89a18;
 }
 
 .member-heading {
@@ -480,16 +596,7 @@ button:disabled {
   width: 27px;
   height: 27px;
   flex: 0 0 auto;
-  background-image: url("/profile.png");
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
-}
-
-.user-circle-icon::before,
-.user-circle-icon::after {
-  content: "";
-  display: none;
+  color: #4e5e75;
 }
 
 .plain-title-input,
@@ -524,7 +631,7 @@ button:disabled {
 }
 
 .edit-icon-button {
-  transform: scaleX(-1);
+  color: #66758b;
 }
 
 .player-head-right,
@@ -564,6 +671,10 @@ button:disabled {
 .dark-button,
 .danger-text-button,
 .add-raid-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-height: 30px;
   border-radius: 7px;
   padding: 5px 10px;
@@ -761,23 +872,7 @@ button:disabled {
   display: block;
   width: 14px;
   height: 14px;
-  background: #050505;
-  mask-position: center;
-  mask-repeat: no-repeat;
-  mask-size: contain;
-  -webkit-mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-size: contain;
-}
-
-.role-icon.sword {
-  mask-image: url("/icon-sword.png");
-  -webkit-mask-image: url("/icon-sword.png");
-}
-
-.role-icon.shield {
-  mask-image: url("/icon-shield.png");
-  -webkit-mask-image: url("/icon-shield.png");
+  color: #111827;
 }
 
 .character-title-cell {
@@ -917,17 +1012,8 @@ button:disabled {
 .fold-icon {
   width: 15px;
   height: 15px;
-  background: currentColor;
-  mask-image: url("/fold.svg");
-  mask-position: center;
-  mask-repeat: no-repeat;
-  mask-size: contain;
   transform: rotate(180deg);
   transition: transform 220ms ease;
-  -webkit-mask-image: url("/fold.svg");
-  -webkit-mask-position: center;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-size: contain;
 }
 
 .fold-icon.expanded {
