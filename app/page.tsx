@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import type { CSSProperties } from "react";
+import lostarkGoldIcon from "../lostark_gold.png";
 import {
   RAID_DEFINITIONS,
   SUPPORT_CLASS_NAMES,
@@ -68,7 +69,6 @@ const ICON_PATHS = {
   close: "/icons/close.svg",
   dealer: "/icons/dealer.svg",
   edit: "/icons/edit.svg",
-  gold: "/icons/gold.svg",
   refresh: "/icons/refresh.svg",
   settings: "/icons/settings.svg",
   sparkle: "/icons/sparkle.svg",
@@ -90,6 +90,19 @@ function CoolIcon({
     <span
       className={`cool-icon ${className}`.trim()}
       style={{ "--icon-url": `url(${ICON_PATHS[name]})` } as CSSProperties}
+      aria-hidden="true"
+    />
+  );
+}
+
+const GOLD_ICON_URL =
+  typeof lostarkGoldIcon === "string" ? lostarkGoldIcon : lostarkGoldIcon.src;
+
+function GoldIcon({ className = "" }: { className?: string }) {
+  return (
+    <span
+      className={`gold-image-icon ${className}`.trim()}
+      style={{ backgroundImage: `url(${GOLD_ICON_URL})` }}
       aria-hidden="true"
     />
   );
@@ -263,15 +276,6 @@ export default function Home() {
         ),
       ),
     [players, raidWeek],
-  );
-
-  const selectedRaidCount = useMemo(
-    () =>
-      characterInputs.reduce(
-        (count, character) => count + new Set(character.selectedRaids).size,
-        0,
-      ),
-    [characterInputs],
   );
 
   useEffect(() => {
@@ -620,32 +624,6 @@ export default function Home() {
     setNotice("");
   };
 
-  const completedRaidCount = players.reduce(
-    (count, player) =>
-      count +
-      player.expeditions.reduce(
-        (expeditionCount, expedition) =>
-          expeditionCount +
-          expedition.characters.reduce(
-            (characterCount, character) =>
-              characterCount +
-              character.selectedRaids.filter(
-                (raidName) => character.raidCompletions[raidName] === raidWeek,
-              ).length,
-            0,
-          ),
-        0,
-      ),
-    0,
-  );
-
-  const totalGroups = generatedPlan
-    ? Object.values(generatedPlan.groupsByRaid).reduce(
-        (count, groups) => count + groups.length,
-        0,
-      )
-    : 0;
-
   if (booting) {
     return <div className="room-loading">공유 공격대 정보를 불러오는 중입니다.</div>;
   }
@@ -683,9 +661,6 @@ export default function Home() {
               <span>플레이어 {players.length}</span>
               <span>원정대 {players.reduce((count, player) => count + player.expeditions.length, 0)}</span>
               <span>캐릭터 {characterInputs.length}</span>
-              <span>선택 레이드 {selectedRaidCount}</span>
-              <span>완료 {completedRaidCount}</span>
-              <span>생성 공대 {totalGroups}</span>
             </div>
           </div>
 
@@ -990,7 +965,7 @@ function RaidStatusPanel({
                     className="raid-status-gold-total"
                     aria-label={`완료 레이드 골드 합계 ${totals.total.toLocaleString("ko-KR")}`}
                   >
-                    <CoolIcon name="gold" />
+                    <GoldIcon />
                     {totals.total.toLocaleString("ko-KR")} (
                     {totals.tradable.toLocaleString("ko-KR")} + {totals.bound.toLocaleString("ko-KR")})
                   </span>
@@ -1069,7 +1044,7 @@ function RaidStatusPanel({
                                     <span className="raid-status-check-copy">
                                       <span>{raidName}</span>
                                       <small>
-                                        <CoolIcon name="gold" />
+                                        <GoldIcon />
                                         {raid.gold.toLocaleString("ko-KR")} (
                                         {raid.tradableGold.toLocaleString("ko-KR")} + {raid.boundGold.toLocaleString("ko-KR")})
                                       </small>
