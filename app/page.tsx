@@ -1143,20 +1143,22 @@ function RaidStatusPanel({
                                         {raid.tradableGold.toLocaleString("ko-KR")} + {raid.boundGold.toLocaleString("ko-KR")})
                                       </small>
                                     </span>
-                                    <input
-                                      type="checkbox"
-                                      checked={completed}
-                                      onChange={(event) =>
-                                        onSetCompletion(
-                                          player.id,
-                                          expedition.id,
-                                          character.id,
-                                          raidName,
-                                          event.target.checked,
-                                        )
-                                      }
-                                      aria-label={`${character.name} ${raidName} 완료`}
-                                    />
+                                    <span className="raid-completion-indicator">
+                                      <input
+                                        type="checkbox"
+                                        checked={completed}
+                                        onChange={(event) =>
+                                          onSetCompletion(
+                                            player.id,
+                                            expedition.id,
+                                            character.id,
+                                            raidName,
+                                            event.target.checked,
+                                          )
+                                        }
+                                        aria-label={`${character.name} ${raidName} 완료`}
+                                      />
+                                    </span>
                                   </label>
                                 );
                               })
@@ -1593,7 +1595,14 @@ function PlayerEditor({
               id={`player-${player.id}`}
               key={player.id}
             >
-              <div className="player-card-head">
+              <div
+                className="player-card-head"
+                onClick={(event) => {
+                  const target = event.target as Element;
+                  if (target.closest("button, input")) return;
+                  toggleCollapsedPlayer(player.id);
+                }}
+              >
                 <div className="player-name-line">
                   <button
                     className={`favorite-player-button${isFavorite ? " active" : ""}`}
@@ -2325,20 +2334,22 @@ function IntegratedCharacterCard({
                     }}
                   />
                 </span>
-                <input
-                  type="checkbox"
-                  checked={completed}
-                  onChange={(event) =>
-                    onSetCompletion(
-                      player.id,
-                      expedition.id,
-                      character.id,
-                      raidName,
-                      event.target.checked,
-                    )
-                  }
-                  aria-label={`${character.name} ${raidName} 완료`}
-                />
+                <span className="raid-completion-indicator">
+                  <input
+                    type="checkbox"
+                    checked={completed}
+                    onChange={(event) =>
+                      onSetCompletion(
+                        player.id,
+                        expedition.id,
+                        character.id,
+                        raidName,
+                        event.target.checked,
+                      )
+                    }
+                    aria-label={`${character.name} ${raidName} 완료`}
+                  />
+                </span>
               </label>
             );
           })

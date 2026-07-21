@@ -679,13 +679,24 @@ button:disabled {
 .raid-status-check input {
   width: 17px;
   height: 17px;
-  flex: 0 0 auto;
-  border-radius: 4px;
   accent-color: #3f805d;
 }
 
-.raid-status-check.recommended input {
-  outline: 0;
+.raid-completion-indicator {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 4px;
+  line-height: 0;
+}
+
+.raid-completion-indicator input {
+  display: block;
+  margin: 0;
+  border-radius: inherit;
+}
+
+.raid-status-check.recommended .raid-completion-indicator {
   box-shadow:
     0 0 0 1px #d89a18,
     0 0 0 4px rgb(224 170 49 / 35%);
@@ -733,6 +744,7 @@ button:disabled {
   min-height: 78px;
   border-bottom: 1px solid var(--line);
   padding: 18px 22px;
+  cursor: pointer;
 }
 
 .player-name-line {
@@ -2034,13 +2046,10 @@ button:disabled {
 .integrated-raid-card input {
   width: 18px;
   height: 18px;
-  flex: 0 0 auto;
-  border-radius: 4px;
   accent-color: #3f805d;
 }
 
-.integrated-raid-card.recommended input {
-  outline: 0;
+.integrated-raid-card.recommended .raid-completion-indicator {
   box-shadow:
     0 0 0 1px #d89a18,
     0 0 0 4px rgb(224 170 49 / 32%);
