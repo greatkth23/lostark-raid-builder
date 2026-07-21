@@ -779,7 +779,8 @@ button:disabled {
   top: calc(100% + 6px);
   left: 0;
   display: grid;
-  min-width: 190px;
+  width: 300px;
+  max-width: calc(100vw - 32px);
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -788,10 +789,11 @@ button:disabled {
 }
 
 .restore-character-menu button {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content max-content;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  column-gap: 16px;
   border: 0;
   border-bottom: 1px solid var(--line);
   background: #ffffff;
@@ -811,12 +813,14 @@ button:disabled {
 .restore-character-menu strong {
   font-size: 14px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .restore-character-menu span {
   color: var(--muted);
   font-size: 12px;
   font-weight: 400;
+  white-space: nowrap;
 }
 
 .expedition-stack {
