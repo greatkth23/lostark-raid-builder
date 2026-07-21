@@ -44,7 +44,7 @@ type RosterCharacter = {
   combatPower: number;
 };
 
-type TabKey = "players" | "status" | "results";
+type TabKey = "players" | "results";
 
 const STORAGE_KEY = "lostark-raid-builder-v3";
 const LEGACY_STORAGE_KEYS = [
@@ -54,8 +54,7 @@ const LEGACY_STORAGE_KEYS = [
 const API_KEY_STORAGE_KEY = "lostark-openapi-jwt";
 
 const TABS: Array<{ id: TabKey; label: string }> = [
-  { id: "players", label: "멤버 목록" },
-  { id: "status", label: "레이드 현황" },
+  { id: "players", label: "멤버 및 레이드" },
   { id: "results", label: "자동구성 결과" },
 ];
 
@@ -72,8 +71,10 @@ const ICON_PATHS = {
   refresh: "/icons/refresh.svg",
   settings: "/icons/settings.svg",
   sparkle: "/icons/sparkle.svg",
+  sliders: "/icons/sliders.svg",
   support: "/icons/support.svg",
   trash: "/icons/trash.svg",
+  undo: "/icons/undo.svg",
   user: "/icons/user.svg",
 } as const;
 
@@ -122,7 +123,6 @@ export default function Home() {
   const [generatedFingerprint, setGeneratedFingerprint] = useState("");
   const [notice, setNotice] = useState("");
   const [syncingId, setSyncingId] = useState("");
-  const [expandedCharacters, setExpandedCharacters] = useState<Set<string>>(new Set());
   const [pendingScrollPlayerId, setPendingScrollPlayerId] = useState("");
   const roomRef = useRef<RaidGroupRoom | null>(null);
   const raidWeekRef = useRef("");
@@ -709,7 +709,7 @@ export default function Home() {
           <PlayerEditor
             players={players}
             syncingId={syncingId}
-            expandedCharacters={expandedCharacters}
+            raidWeek={raidWeek}
             onAddPlayer={addPlayer}
             onRemovePlayer={removePlayer}
             onUpdatePlayer={updatePlayer}
@@ -723,26 +723,10 @@ export default function Home() {
             onRestoreCharacter={restoreCharacter}
             onRemoveCharacter={removeCharacter}
             onSetRole={setCharacterRole}
-            onToggleRaid={toggleRaid}
-            onToggleCharacter={(characterId) =>
-              setExpandedCharacters((current) => {
-                const next = new Set(current);
-                if (next.has(characterId)) {
-                  next.delete(characterId);
-                } else {
-                  next.add(characterId);
-                }
-                return next;
-              })
-            }
-          />
-        ) : activeTab === "status" ? (
-          <RaidStatusPanel
-            players={players}
-            raidWeek={raidWeek}
             onSetGoldPreference={setGoldPreference}
             onSetCompletion={setRaidCompletion}
-            onReset={resetRaidCompletions}
+            onResetCompletions={resetRaidCompletions}
+            onToggleRaid={toggleRaid}
           />
         ) : (
           <ResultPanel
@@ -901,6 +885,8 @@ function RaidGroupGate({
   );
 }
 
+// Kept temporarily for legacy persisted views during the integrated UI migration.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function RaidStatusPanel({
   players,
   raidWeek,
@@ -1220,7 +1206,7 @@ function mergeRosterIntoExpedition(
 function PlayerEditor({
   players,
   syncingId,
-  expandedCharacters,
+  raidWeek,
   onAddPlayer,
   onRemovePlayer,
   onUpdatePlayer,
@@ -1234,12 +1220,14 @@ function PlayerEditor({
   onRestoreCharacter,
   onRemoveCharacter,
   onSetRole,
+  onSetGoldPreference,
+  onSetCompletion,
+  onResetCompletions,
   onToggleRaid,
-  onToggleCharacter,
 }: {
   players: Player[];
   syncingId: string;
-  expandedCharacters: Set<string>;
+  raidWeek: string;
   onAddPlayer: () => void;
   onRemovePlayer: (playerId: string) => void;
   onUpdatePlayer: (playerId: string, patch: Partial<Player>) => void;
@@ -1270,6 +1258,20 @@ function PlayerEditor({
     characterId: string,
     role: Role,
   ) => void;
+  onSetGoldPreference: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    preference: GoldPreference,
+  ) => void;
+  onSetCompletion: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    completed: boolean,
+  ) => void;
+  onResetCompletions: () => void;
   onToggleRaid: (
     playerId: string,
     expeditionId: string,
@@ -1277,7 +1279,6 @@ function PlayerEditor({
     raidName: string,
     checked: boolean,
   ) => void;
-  onToggleCharacter: (characterId: string) => void;
 }) {
   const [editingPlayers, setEditingPlayers] = useState<
     Map<string, { initialValue: string; value: string }>
@@ -1394,9 +1395,17 @@ function PlayerEditor({
     <section className="member-shell">
       <div className="member-heading">
         <div className="member-title">멤버 목록</div>
-        <button className="dark-button" type="button" onClick={onAddPlayer}>
-          <CoolIcon name="add" /> 플레이어 추가
-        </button>
+        <div className="member-heading-actions">
+          <button className="ghost-button" type="button" onClick={onSyncAll}>
+            <CoolIcon name="refresh" /> 동기화
+          </button>
+          <button className="ghost-button" type="button" onClick={onResetCompletions}>
+            <CoolIcon name="undo" /> 완료 상태 초기화
+          </button>
+          <button className="dark-button" type="button" onClick={onAddPlayer}>
+            <CoolIcon name="add" /> 플레이어 추가
+          </button>
+        </div>
       </div>
 
       <div className="player-stack">
@@ -1459,48 +1468,21 @@ function PlayerEditor({
                 className={`player-collapsible ${playerCollapsed ? "collapsed" : "expanded"}`}
                 aria-hidden={playerCollapsed}
               >
-                  <div className="player-command-row">
-                    <button className="ghost-button" type="button" onClick={onSyncAll}>
-                      <CoolIcon name="refresh" /> 전체 정보 업데이트
-                    </button>
-                    <button
-                      className="ghost-button"
-                      type="button"
-                      onClick={onResetAllRaids}
-                    >
-                      <CoolIcon name="sparkle" /> 레이드 자동 등록
-                    </button>
-                    <button
-                      className="dark-button"
-                      type="button"
-                      onClick={() => onAddExpedition(player.id)}
-                    >
-                      <CoolIcon name="add" /> 원정대 추가
-                    </button>
-                    <button
-                      className="danger-text-button"
-                      type="button"
-                      onClick={() => onRemovePlayer(player.id)}
-                      disabled={players.length === 1}
-                    >
-                      삭제
-                    </button>
-                  </div>
-
                   <div className="expedition-stack">
                     {player.expeditions.map((expedition) => (
                       <ExpeditionBlock
                         expedition={expedition}
-                        expandedCharacters={expandedCharacters}
                         isSyncing={syncingId === `${player.id}:${expedition.id}`}
                         key={expedition.id}
                         player={player}
+                        raidWeek={raidWeek}
                         onRestoreCharacter={onRestoreCharacter}
                         onRemoveCharacter={onRemoveCharacter}
                         onRemoveExpedition={onRemoveExpedition}
                         onSetRole={onSetRole}
+                        onSetGoldPreference={onSetGoldPreference}
+                        onSetCompletion={onSetCompletion}
                         onSyncRoster={onSyncRoster}
-                        onToggleCharacter={onToggleCharacter}
                         onToggleRaid={onToggleRaid}
                         onOpenSettings={() =>
                           setSettingsTarget({
@@ -1524,6 +1506,32 @@ function PlayerEditor({
                         }
                       />
                     ))}
+                  </div>
+                  <div className="player-footer-actions">
+                    <button
+                      className="danger-text-button player-delete-button"
+                      type="button"
+                      onClick={() => onRemovePlayer(player.id)}
+                      disabled={players.length === 1}
+                    >
+                      <CoolIcon name="trash" /> 플레이어 삭제
+                    </button>
+                    <div>
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={onResetAllRaids}
+                      >
+                        <CoolIcon name="sliders" /> 레이드 자동 등록
+                      </button>
+                      <button
+                        className="dark-button"
+                        type="button"
+                        onClick={() => onAddExpedition(player.id)}
+                      >
+                        <CoolIcon name="add" /> 원정대 추가
+                      </button>
+                    </div>
                   </div>
               </div>
             </article>
@@ -1553,7 +1561,7 @@ function PlayerEditor({
 function ExpeditionBlock({
   player,
   expedition,
-  expandedCharacters,
+  raidWeek,
   isEditingName,
   isSyncing,
   nameDraft,
@@ -1561,17 +1569,18 @@ function ExpeditionBlock({
   onRemoveCharacter,
   onRemoveExpedition,
   onSetRole,
+  onSetGoldPreference,
+  onSetCompletion,
   onOpenSettings,
   onChangeNameDraft,
   onStartEditName,
   onStopEditName,
   onSyncRoster,
-  onToggleCharacter,
   onToggleRaid,
 }: {
   player: Player;
   expedition: Expedition;
-  expandedCharacters: Set<string>;
+  raidWeek: string;
   isEditingName: boolean;
   isSyncing: boolean;
   nameDraft: string;
@@ -1592,12 +1601,24 @@ function ExpeditionBlock({
     characterId: string,
     role: Role,
   ) => void;
+  onSetGoldPreference: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    preference: GoldPreference,
+  ) => void;
+  onSetCompletion: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    completed: boolean,
+  ) => void;
   onOpenSettings: () => void;
   onChangeNameDraft: (value: string) => void;
   onStartEditName: () => void;
   onStopEditName: (value: string) => void;
   onSyncRoster: (playerId: string, expeditionId: string) => void;
-  onToggleCharacter: (characterId: string) => void;
   onToggleRaid: (
     playerId: string,
     expeditionId: string,
@@ -1608,6 +1629,7 @@ function ExpeditionBlock({
 }) {
   const [restoreOpen, setRestoreOpen] = useState(false);
   const restorableCharacters = getRestorableCharacters(expedition);
+  const goldProgress = getExpeditionTradableGoldProgress(expedition, raidWeek);
 
   return (
     <section className="expedition-block">
@@ -1648,6 +1670,11 @@ function ExpeditionBlock({
               <span>· 마지막 동기화 {formatDateTime(expedition.lastSyncedAt)}</span>
             ) : null}
           </div>
+          <div className="expedition-gold-progress">
+            <GoldIcon />
+            <strong>{goldProgress.earned.toLocaleString("ko-KR")}G</strong>
+            <span>/ {goldProgress.available.toLocaleString("ko-KR")}G</span>
+          </div>
         </div>
         <div className="expedition-actions">
           <button
@@ -1679,17 +1706,18 @@ function ExpeditionBlock({
         className={`expedition-collapsible ${expedition.charactersHidden ? "collapsed" : "expanded"}`}
         aria-hidden={expedition.charactersHidden}
       >
-        <div className="character-row-stack">
+        <div className="integrated-character-grid">
           {expedition.characters.map((character) => (
-            <CharacterRow
+            <IntegratedCharacterCard
               character={character}
-              expanded={expandedCharacters.has(character.id)}
               expedition={expedition}
               key={character.id}
               player={player}
+              raidWeek={raidWeek}
               onRemoveCharacter={onRemoveCharacter}
               onSetRole={onSetRole}
-              onToggleCharacter={onToggleCharacter}
+              onSetGoldPreference={onSetGoldPreference}
+              onSetCompletion={onSetCompletion}
               onToggleRaid={onToggleRaid}
             />
           ))}
@@ -1823,6 +1851,324 @@ function ExpeditionSettingsModal({
   );
 }
 
+type GoldTotals = {
+  total: number;
+  tradable: number;
+  bound: number;
+};
+
+const EMPTY_GOLD_TOTALS: GoldTotals = { total: 0, tradable: 0, bound: 0 };
+
+function getCharacterRecommendedGold(
+  character: Character,
+  raidWeek: string,
+  completedOnly: boolean,
+) {
+  return getGoldRecommendedRaidNames(
+    character.selectedRaids,
+    character.goldPreference,
+  ).reduce<GoldTotals>((totals, raidName) => {
+    if (completedOnly && character.raidCompletions[raidName] !== raidWeek) {
+      return totals;
+    }
+    const raid = getRaidDefinition(raidName);
+    if (!raid) return totals;
+    return {
+      total: totals.total + raid.gold,
+      tradable: totals.tradable + raid.tradableGold,
+      bound: totals.bound + raid.boundGold,
+    };
+  }, { ...EMPTY_GOLD_TOTALS });
+}
+
+function getExpeditionTradableGoldProgress(
+  expedition: Expedition,
+  raidWeek: string,
+) {
+  return expedition.characters.reduce(
+    (progress, character) => {
+      const available = getCharacterRecommendedGold(character, raidWeek, false);
+      const earned = getCharacterRecommendedGold(character, raidWeek, true);
+      progress.available += available.tradable;
+      progress.earned += earned.tradable;
+      return progress;
+    },
+    { earned: 0, available: 0 },
+  );
+}
+
+function GoldBreakdown({ totals }: { totals: GoldTotals }) {
+  return (
+    <span className="gold-breakdown">
+      <GoldIcon />
+      <strong>{totals.total.toLocaleString("ko-KR")}G</strong>
+      <span>
+        ({totals.tradable.toLocaleString("ko-KR")} + {totals.bound.toLocaleString("ko-KR")})
+      </span>
+    </span>
+  );
+}
+
+function CompactRaidSelector({
+  player,
+  expedition,
+  character,
+  onToggleRaid,
+}: {
+  player: Player;
+  expedition: Expedition;
+  character: Character;
+  onToggleRaid: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    checked: boolean,
+  ) => void;
+}) {
+  return (
+    <div className="compact-raid-selector">
+      {RAID_FAMILIES.map((family) => {
+        const raids = RAID_DEFINITIONS.filter((raid) => raid.family === family.id);
+        if (!raids.some((raid) => character.itemLevel >= raid.minItemLevel)) return null;
+        return (
+          <div className="compact-raid-family" key={family.id}>
+            <span>{family.label}</span>
+            <div className="difficulty-buttons">
+              {raids.map((raid) => {
+                const selected = character.selectedRaids.includes(raid.name);
+                const locked = character.itemLevel < raid.minItemLevel;
+                return (
+                  <button
+                    className={selected ? "selected" : ""}
+                    key={raid.name}
+                    type="button"
+                    disabled={locked}
+                    title={locked ? `입장 레벨 ${raid.minItemLevel} 필요` : undefined}
+                    onClick={() =>
+                      onToggleRaid(
+                        player.id,
+                        expedition.id,
+                        character.id,
+                        raid.name,
+                        !selected,
+                      )
+                    }
+                  >
+                    {raid.variant}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function IntegratedCharacterCard({
+  player,
+  expedition,
+  character,
+  raidWeek,
+  onRemoveCharacter,
+  onSetRole,
+  onSetGoldPreference,
+  onSetCompletion,
+  onToggleRaid,
+}: {
+  player: Player;
+  expedition: Expedition;
+  character: Character;
+  raidWeek: string;
+  onRemoveCharacter: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+  ) => void;
+  onSetRole: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    role: Role,
+  ) => void;
+  onSetGoldPreference: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    preference: GoldPreference,
+  ) => void;
+  onSetCompletion: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    completed: boolean,
+  ) => void;
+  onToggleRaid: (
+    playerId: string,
+    expeditionId: string,
+    characterId: string,
+    raidName: string,
+    checked: boolean,
+  ) => void;
+}) {
+  const [editingRaids, setEditingRaids] = useState(false);
+  const supportCapable = isSupportClass(character.className);
+  const recommendedRaids = new Set(
+    getGoldRecommendedRaidNames(character.selectedRaids, character.goldPreference),
+  );
+  const completedGold = getCharacterRecommendedGold(character, raidWeek, true);
+
+  return (
+    <article className="integrated-character-card">
+      <header className="integrated-character-head">
+        <div className="integrated-character-identity">
+          <CoolIcon name={character.role === "support" ? "support" : "dealer"} />
+          <strong>{character.name || "캐릭터명"}</strong>
+          <span className="class-pill-text">{character.className || "직업 없음"}</span>
+          {supportCapable ? (
+            <button
+              className={`single-role-button ${character.role === "support" ? "support-option" : "dealer-option"}`}
+              type="button"
+              onClick={() =>
+                onSetRole(
+                  player.id,
+                  expedition.id,
+                  character.id,
+                  character.role === "support" ? "dealer" : "support",
+                )
+              }
+            >
+              {character.role === "support" ? "서폿" : "딜러"}
+            </button>
+          ) : null}
+        </div>
+        <button
+          className="integrated-character-delete"
+          type="button"
+          aria-label={`${character.name || "캐릭터"} 삭제`}
+          onClick={() => onRemoveCharacter(player.id, expedition.id, character.id)}
+        >
+          <CoolIcon name="trash" />
+        </button>
+      </header>
+
+      <div className="integrated-character-meta">
+        <span>레벨 {formatItemLevel(character.itemLevel)}</span>
+        <span>·</span>
+        <span className={character.role === "support" ? "power-text support" : "power-text dealer"}>
+          전투력 {character.combatPower.toLocaleString("ko-KR")}
+        </span>
+      </div>
+      <GoldBreakdown totals={completedGold} />
+
+      <div className="integrated-character-divider" />
+      <div className="integrated-raid-list">
+        {character.selectedRaids.length ? (
+          character.selectedRaids.map((raidName) => {
+            const raid = getRaidDefinition(raidName);
+            if (!raid) return null;
+            const completed = character.raidCompletions[raidName] === raidWeek;
+            const recommended = recommendedRaids.has(raidName);
+            return (
+              <label
+                className={`integrated-raid-card${completed ? " completed" : ""}${recommended ? " recommended" : ""}`}
+                key={raidName}
+              >
+                <span className="integrated-raid-copy">
+                  <strong>{raidName}</strong>
+                  <GoldBreakdown
+                    totals={{
+                      total: raid.gold,
+                      tradable: raid.tradableGold,
+                      bound: raid.boundGold,
+                    }}
+                  />
+                </span>
+                <input
+                  type="checkbox"
+                  checked={completed}
+                  onChange={(event) =>
+                    onSetCompletion(
+                      player.id,
+                      expedition.id,
+                      character.id,
+                      raidName,
+                      event.target.checked,
+                    )
+                  }
+                  aria-label={`${character.name} ${raidName} 완료`}
+                />
+              </label>
+            );
+          })
+        ) : (
+          <p className="integrated-raid-empty">선택된 레이드가 없습니다.</p>
+        )}
+      </div>
+
+      {editingRaids ? (
+        <CompactRaidSelector
+          player={player}
+          expedition={expedition}
+          character={character}
+          onToggleRaid={onToggleRaid}
+        />
+      ) : null}
+
+      <footer className="integrated-character-footer">
+        <button
+          className="square-add-button"
+          type="button"
+          aria-expanded={editingRaids}
+          aria-label={editingRaids ? "레이드 편집 닫기" : "레이드 추가"}
+          onClick={() => setEditingRaids((current) => !current)}
+        >
+          <CoolIcon name={editingRaids ? "close" : "add"} />
+        </button>
+        <span className="gold-preference-control" aria-label="골드 추천 기준">
+          <button
+            type="button"
+            className={`gold-preference-label${character.goldPreference === "bound" ? " active" : ""}`}
+            aria-pressed={character.goldPreference === "bound"}
+            onClick={() => onSetGoldPreference(player.id, expedition.id, character.id, "bound")}
+          >
+            귀속
+          </button>
+          <button
+            type="button"
+            className={`gold-preference-switch${character.goldPreference === "tradable" ? " on" : ""}`}
+            aria-label={`골드 추천 기준을 ${character.goldPreference === "tradable" ? "귀속" : "유통"} 골드로 변경`}
+            aria-pressed={character.goldPreference === "tradable"}
+            onClick={() =>
+              onSetGoldPreference(
+                player.id,
+                expedition.id,
+                character.id,
+                character.goldPreference === "tradable" ? "bound" : "tradable",
+              )
+            }
+          >
+            <span />
+          </button>
+          <button
+            type="button"
+            className={`gold-preference-label${character.goldPreference === "tradable" ? " active" : ""}`}
+            aria-pressed={character.goldPreference === "tradable"}
+            onClick={() => onSetGoldPreference(player.id, expedition.id, character.id, "tradable")}
+          >
+            유통
+          </button>
+        </span>
+      </footer>
+    </article>
+  );
+}
+
+// Kept temporarily for legacy persisted views during the integrated UI migration.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function CharacterRow({
   player,
   expedition,
