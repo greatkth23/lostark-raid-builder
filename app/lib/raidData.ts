@@ -1,6 +1,8 @@
 import {
   getAutoRaidsForLevel,
   getExclusiveRaidNames,
+  getRaidDefinition,
+  type GoldPreference,
   type Role,
 } from "./raidPlanner";
 
@@ -12,6 +14,7 @@ export type Character = {
   combatPower: number;
   className: string;
   role: Role;
+  goldPreference: GoldPreference;
   selectedRaids: string[];
   raidCompletions: Record<string, string>;
   raidsEdited: boolean;
@@ -88,6 +91,13 @@ export type RaidGroupOperation =
       role: Role;
     }
   | {
+      type: "character.goldPreference";
+      playerId: string;
+      expeditionId: string;
+      characterId: string;
+      preference: GoldPreference;
+    }
+  | {
       type: "character.raid";
       playerId: string;
       expeditionId: string;
@@ -116,6 +126,7 @@ export const createCharacter = (): Character => ({
   combatPower: 0,
   className: "",
   role: "dealer",
+  goldPreference: "tradable",
   selectedRaids: getAutoRaidsForLevel(1710),
   raidCompletions: {},
   raidsEdited: false,
@@ -252,6 +263,7 @@ export const normalizeCharacter = (value: unknown): Character | null => {
         source.selectedRaids.filter(
           (raid): raid is string => typeof raid === "string",
         ),
+        itemLevel,
       )
     : getAutoRaidsForLevel(itemLevel);
   const raidCompletions =
@@ -259,7 +271,9 @@ export const normalizeCharacter = (value: unknown): Character | null => {
       ? Object.fromEntries(
           Object.entries(source.raidCompletions).filter(
             ([raidName, week]) =>
-              typeof raidName === "string" && typeof week === "string",
+              typeof raidName === "string" &&
+              typeof week === "string" &&
+              selectedRaids.includes(raidName),
           ),
         )
       : {};
@@ -274,6 +288,7 @@ export const normalizeCharacter = (value: unknown): Character | null => {
     className:
       typeof source.className === "string" ? source.className.slice(0, 80) : "",
     role: source.role === "support" ? "support" : "dealer",
+    goldPreference: source.goldPreference === "bound" ? "bound" : "tradable",
     selectedRaids,
     raidCompletions,
     raidsEdited: Boolean(source.raidsEdited),
@@ -408,8 +423,22 @@ export const applyRaidGroupOperation = (
         roleEdited: true,
       }));
       break;
+    case "character.goldPreference":
+      players = mapCharacter(players, operation, (character) => ({
+        ...character,
+        goldPreference:
+          operation.preference === "bound" ? "bound" : "tradable",
+      }));
+      break;
     case "character.raid":
       players = mapCharacter(players, operation, (character) => {
+        const raid = getRaidDefinition(operation.raidName);
+        if (
+          operation.checked &&
+          (!raid || character.itemLevel < raid.minItemLevel)
+        ) {
+          return character;
+        }
         const blockedRaids = getExclusiveRaidNames(operation.raidName);
         const selectedRaids = operation.checked
           ? [
@@ -513,8 +542,10 @@ const sanitizeExpeditionPatch = (
     : {}),
 });
 
-const makeExclusiveRaids = (raids: string[]) =>
+const makeExclusiveRaids = (raids: string[], itemLevel: number) =>
   raids.reduce<string[]>((selectedRaids, raidName) => {
+    const raid = getRaidDefinition(raidName);
+    if (!raid || itemLevel < raid.minItemLevel) return selectedRaids;
     const blockedRaids = getExclusiveRaidNames(raidName);
     return [
       ...selectedRaids.filter(
