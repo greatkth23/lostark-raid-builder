@@ -693,14 +693,17 @@ export default function Home() {
               className={activeTab === tab.id ? "active" : ""}
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                if (tab.id === "results") {
+                  generatePlan();
+                  return;
+                }
+                setActiveTab(tab.id);
+              }}
             >
               {tab.label}
             </button>
           ))}
-          <button className="generate-tab-button" type="button" onClick={generatePlan}>
-            레이드 자동구성
-          </button>
         </nav>
 
         {notice ? <div className="notice-bar">{notice}</div> : null}
