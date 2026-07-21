@@ -68,35 +68,71 @@ button:disabled {
 }
 
 .app-header {
+  display: block;
+  padding: 2px 0 0;
+}
+
+.room-identity {
+  display: grid;
+  width: 100%;
+  gap: 5px;
+}
+
+.room-title-row {
   display: flex;
-  align-items: flex-end;
+  min-width: 0;
+  align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 18px;
+  gap: 16px;
+}
+
+.room-title-row h1 {
+  min-width: 0;
+  margin: 0;
+  color: #101828;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 30px;
+  overflow-wrap: anywhere;
 }
 
 .metric-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
-}
-
-.metric-row span {
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: #ffffff;
-  padding: 5px 10px;
+  line-height: 20px;
 }
 
 .header-actions {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.header-icon-button {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  color: #536176;
+  padding: 0;
+  font-size: 17px;
+}
+
+.header-icon-button:hover {
+  border-color: #c7d0dc;
+  background: #f8fafc;
+  color: #182230;
+}
+
+.header-icon-button:focus-visible {
+  outline: 2px solid rgb(37 99 235 / 18%);
+  outline-offset: 2px;
 }
 
 .gear-button {
@@ -125,29 +161,48 @@ button:disabled {
 }
 
 .tab-strip {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
-  gap: 8px;
+  gap: 24px;
+  align-items: flex-end;
+  margin-right: -24px;
+  margin-left: -24px;
   overflow-x: auto;
   border-bottom: 1px solid var(--line);
-  padding-bottom: 10px;
+  background: rgb(247 248 251 / 96%);
+  padding: 0 24px;
+  backdrop-filter: blur(8px);
 }
 
 .tab-strip button {
-  min-height: 40px;
+  position: relative;
+  min-height: 44px;
   white-space: nowrap;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #ffffff;
-  padding: 8px 16px;
-  color: #435066;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 10px 2px 11px;
+  color: #667085;
   font-size: 14px;
   font-weight: 500;
 }
 
 .tab-strip button.active {
-  border-color: #111827;
-  background: #111827;
-  color: #ffffff;
+  background: transparent;
+  color: #101828;
+  font-weight: 600;
+}
+
+.tab-strip button.active::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: #101828;
+  content: "";
 }
 
 .tab-strip .generate-tab-button {
@@ -1300,6 +1355,18 @@ button:disabled {
   font-weight: 500;
 }
 
+.settings-field + .settings-field {
+  margin-top: 15px;
+}
+
+.settings-field small {
+  margin-top: -2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
 .settings-input {
   min-height: 38px;
   border: 1px solid var(--line);
@@ -1375,7 +1442,19 @@ button:disabled {
 .settings-modal-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 18px;
+}
+
+.settings-error {
+  margin-top: 15px;
+  border: 1px solid #fecaca;
+  border-radius: 7px;
+  background: #fff7f7;
+  padding: 9px 11px;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .result-shell {

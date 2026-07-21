@@ -163,6 +163,59 @@ export async function mutateRaidGroup(
   throw new RaidGroupError("동시에 수정된 내용이 많습니다. 잠시 후 다시 시도하세요.", 409);
 }
 
+export async function updateRaidGroupSettings(
+  roomId: string,
+  nameValue: unknown,
+  passwordValue: unknown,
+) {
+  await ensureDatabase();
+  const name = validateName(nameValue);
+  const password = typeof passwordValue === "string" ? passwordValue : "";
+  const d1 = getD1();
+
+  try {
+    if (password) {
+      const validatedPassword = validatePassword(password);
+      const { salt, hash } = await hashPassword(validatedPassword);
+      await d1
+        .prepare(
+          `UPDATE raid_groups
+           SET name = ?1, password_salt = ?2, password_hash = ?3,
+               revision = revision + 1, updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?4`,
+        )
+        .bind(name, salt, hash, roomId)
+        .run();
+    } else {
+      await d1
+        .prepare(
+          `UPDATE raid_groups
+           SET name = ?1, revision = revision + 1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?2`,
+        )
+        .bind(name, roomId)
+        .run();
+    }
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("UNIQUE")) {
+      throw new RaidGroupError("이미 사용 중인 공격대 이름입니다.", 409);
+    }
+    throw error;
+  }
+
+  const room = await d1
+    .prepare("SELECT id, name, revision FROM raid_groups WHERE id = ?1")
+    .bind(roomId)
+    .first<Pick<RaidGroupRow, "id" | "name" | "revision">>();
+
+  if (!room) {
+    throw new RaidGroupError("공격대를 찾을 수 없습니다.", 404);
+  }
+
+  return { room };
+}
+
 export async function deleteRaidGroupSession(tokenHash: string | null) {
   if (!tokenHash) return;
   await ensureDatabase();

@@ -54,8 +54,8 @@ const LEGACY_STORAGE_KEYS = [
 const API_KEY_STORAGE_KEY = "lostark-openapi-jwt";
 
 const TABS: Array<{ id: TabKey; label: string }> = [
-  { id: "players", label: "멤버 및 레이드" },
-  { id: "results", label: "자동구성 결과" },
+  { id: "players", label: "멤버 목록" },
+  { id: "results", label: "파티 구성" },
 ];
 
 const RAID_FAMILIES = Array.from(
@@ -68,6 +68,7 @@ const ICON_PATHS = {
   close: "/icons/close.svg",
   dealer: "/icons/dealer.svg",
   edit: "/icons/edit.svg",
+  logOut: "/icons/log-out.svg",
   refresh: "/icons/refresh.svg",
   settings: "/icons/settings.svg",
   sparkle: "/icons/sparkle.svg",
@@ -491,7 +492,42 @@ export default function Home() {
     setGeneratedPlan(plan);
     setGeneratedFingerprint(fingerprint);
     setActiveTab("results");
-    setNotice("공격대 구성이 생성되었습니다.");
+    setNotice("");
+  };
+
+  const saveAppSettings = async ({
+    apiKey: nextApiKey,
+    roomName,
+    password,
+  }: {
+    apiKey: string;
+    roomName: string;
+    password: string;
+  }) => {
+    const response = await fetch("/api/raid-group", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: roomName, password }),
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      room?: RaidGroupRoom;
+    };
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        roomRef.current = null;
+        setRoom(null);
+      }
+      throw new Error(payload.message ?? "설정을 저장하지 못했습니다.");
+    }
+
+    if (payload.room) {
+      roomRef.current = payload.room;
+      setRoom(payload.room);
+    }
+    setApiKey(nextApiKey);
+    setNotice("설정을 저장했습니다.");
   };
 
   const fetchRoster = async (representativeName: string) => {
@@ -649,41 +685,48 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#f7f8fb] text-[#151923]">
-      <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-5">
+      <div className="workspace-shell mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-5">
         <header className="app-header">
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-[#5b6d86]">Lost Ark Raid Builder</p>
-            <h1 className="text-2xl font-bold leading-8">
-              로스트아크 공격대 자동구성
-            </h1>
-            <div className="metric-row">
-              <span>공격대 {room.name}</span>
-              <span>플레이어 {players.length}</span>
-              <span>원정대 {players.reduce((count, player) => count + player.expeditions.length, 0)}</span>
-              <span>캐릭터 {characterInputs.length}</span>
+          <div className="room-identity">
+            <div className="room-title-row">
+              <h1>{room.name}</h1>
+              <div className="header-actions">
+                <button
+                  className="header-icon-button"
+                  type="button"
+                  aria-label="공격대 전환"
+                  title="공격대 전환"
+                  onClick={leaveRaidGroup}
+                >
+                  <CoolIcon name="logOut" />
+                </button>
+                <button
+                  className="header-icon-button"
+                  type="button"
+                  aria-label="설정"
+                  title="설정"
+                  onClick={() => setApiSettingsOpen(true)}
+                >
+                  <CoolIcon name="settings" />
+                </button>
+              </div>
             </div>
-          </div>
-
-          <div className="header-actions">
-            <button className="ghost-button" type="button" onClick={leaveRaidGroup}>
-              공격대 전환
-            </button>
-            <button
-              className="gear-button"
-              type="button"
-            aria-label="API 설정"
-            onClick={() => setApiSettingsOpen(true)}
-          >
-              <CoolIcon name="settings" />
-            </button>
+            <p className="metric-row">
+              플레이어 {players.length} · 원정대{" "}
+              {players.reduce(
+                (count, player) => count + player.expeditions.length,
+                0,
+              )} · 캐릭터 {characterInputs.length}
+            </p>
           </div>
         </header>
 
         {apiSettingsOpen ? (
           <ApiSettingsModal
             apiKey={apiKey}
-            onChangeApiKey={setApiKey}
+            roomName={room.name}
             onClose={() => setApiSettingsOpen(false)}
+            onSave={saveAppSettings}
           />
         ) : null}
 
@@ -1107,30 +1150,65 @@ function getPlayerCompletedGold(player: Player, raidWeek: string) {
 
 function ApiSettingsModal({
   apiKey,
-  onChangeApiKey,
+  roomName,
   onClose,
+  onSave,
 }: {
   apiKey: string;
-  onChangeApiKey: (apiKey: string) => void;
+  roomName: string;
   onClose: () => void;
+  onSave: (settings: {
+    apiKey: string;
+    roomName: string;
+    password: string;
+  }) => Promise<void>;
 }) {
+  const [nextApiKey, setNextApiKey] = useState(apiKey);
+  const [nextRoomName, setNextRoomName] = useState(roomName);
+  const [nextPassword, setNextPassword] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submitSettings = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      await onSave({
+        apiKey: nextApiKey,
+        roomName: nextRoomName.trim(),
+        password: nextPassword,
+      });
+      onClose();
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "설정을 저장하지 못했습니다.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="settings-modal-backdrop">
-      <section
+      <form
         className="settings-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="api-settings-title"
+        onSubmit={submitSettings}
       >
         <div className="settings-modal-head">
           <div>
-            <h2 id="api-settings-title">API 설정</h2>
-            <p>Lost Ark OpenAPI JWT</p>
+            <h2 id="api-settings-title">설정</h2>
+            <p>공격대 정보와 Lost Ark OpenAPI를 관리합니다.</p>
           </div>
           <button
             className="settings-close-button"
             type="button"
-            aria-label="API 설정 닫기"
+            aria-label="설정 닫기"
             onClick={onClose}
           >
             <CoolIcon name="close" />
@@ -1138,22 +1216,57 @@ function ApiSettingsModal({
         </div>
 
         <label className="settings-field">
+          <span>공격대 이름</span>
+          <input
+            className="settings-input"
+            type="text"
+            value={nextRoomName}
+            minLength={2}
+            maxLength={40}
+            autoComplete="organization"
+            onChange={(event) => setNextRoomName(event.target.value)}
+            required
+          />
+        </label>
+
+        <label className="settings-field">
+          <span>새 비밀번호</span>
+          <input
+            className="settings-input"
+            type="password"
+            value={nextPassword}
+            minLength={6}
+            maxLength={72}
+            autoComplete="new-password"
+            placeholder="변경할 때만 입력"
+            onChange={(event) => setNextPassword(event.target.value)}
+          />
+          <small>기존 비밀번호를 유지하려면 비워 두세요.</small>
+        </label>
+
+        <label className="settings-field">
           <span>API 키</span>
           <input
             className="settings-input"
             type="password"
-            value={apiKey}
+            value={nextApiKey}
             placeholder="Lost Ark OpenAPI JWT"
-            onChange={(event) => onChangeApiKey(event.target.value)}
+            autoComplete="off"
+            onChange={(event) => setNextApiKey(event.target.value)}
           />
         </label>
 
+        {error ? <div className="settings-error">{error}</div> : null}
+
         <div className="settings-modal-actions">
-          <button className="dark-button" type="button" onClick={onClose}>
-            완료
+          <button className="ghost-button" type="button" onClick={onClose}>
+            취소
+          </button>
+          <button className="dark-button" type="submit" disabled={saving}>
+            {saving ? "저장 중..." : "저장"}
           </button>
         </div>
-      </section>
+      </form>
     </div>
   );
 }
@@ -2464,7 +2577,7 @@ function ResultPanel({
     <section className="result-shell">
       <div className="result-heading">
         <div>
-          <h2>자동구성 결과</h2>
+          <h2>파티 구성</h2>
           <p>공석은 숨기고 내부 멤버만 표시합니다.</p>
         </div>
         <button className="dark-button" type="button" onClick={onGenerate}>

@@ -7,6 +7,7 @@ import {
   makeSessionCookie,
   mutateRaidGroup,
   RaidGroupError,
+  updateRaidGroupSettings,
 } from "../../lib/raidGroupStore";
 
 export async function GET(request: Request) {
@@ -64,6 +65,25 @@ export async function PATCH(request: Request) {
     if (!session) return unauthorized();
     const body = (await request.json()) as { operation?: unknown };
     const result = await mutateRaidGroup(session.roomId, body.operation);
+    return Response.json(result);
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const session = await getRaidGroupSession(request);
+    if (!session) return unauthorized();
+    const body = (await request.json()) as {
+      name?: unknown;
+      password?: unknown;
+    };
+    const result = await updateRaidGroupSettings(
+      session.roomId,
+      body.name,
+      body.password,
+    );
     return Response.json(result);
   } catch (error) {
     return errorResponse(error);
