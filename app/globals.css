@@ -680,13 +680,15 @@ button:disabled {
   width: 17px;
   height: 17px;
   flex: 0 0 auto;
+  border-radius: 4px;
   accent-color: #3f805d;
 }
 
 .raid-status-check.recommended input {
-  outline: 3px solid rgb(224 170 49 / 35%);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 1px #d89a18;
+  outline: 0;
+  box-shadow:
+    0 0 0 1px #d89a18,
+    0 0 0 4px rgb(224 170 49 / 35%);
 }
 
 .member-heading {
@@ -754,8 +756,8 @@ button:disabled {
 }
 
 .favorite-player-button .cool-icon {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
 }
 
 .favorite-player-button.active {
@@ -2033,13 +2035,15 @@ button:disabled {
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
+  border-radius: 4px;
   accent-color: #3f805d;
 }
 
 .integrated-raid-card.recommended input {
-  outline: 3px solid rgb(224 170 49 / 32%);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 1px #d89a18;
+  outline: 0;
+  box-shadow:
+    0 0 0 1px #d89a18,
+    0 0 0 4px rgb(224 170 49 / 32%);
 }
 
 .integrated-raid-empty {
@@ -2284,7 +2288,7 @@ button:disabled {
     min-width: 0;
     gap: 0;
     border-top: 1px solid var(--line);
-    padding-top: 14px;
+    padding-top: 10px;
   }
 
   .player-card {
@@ -2293,6 +2297,10 @@ button:disabled {
     border: 0;
     border-radius: 0;
     background: transparent;
+  }
+
+  .player-card.collapsed {
+    padding-bottom: 10px;
   }
 
   .player-card + .player-card {
