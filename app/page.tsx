@@ -1588,7 +1588,11 @@ function PlayerEditor({
           const isFavorite = player.id === favoritePlayerId;
 
           return (
-            <article className="player-card" id={`player-${player.id}`} key={player.id}>
+            <article
+              className={`player-card${playerCollapsed ? " collapsed" : ""}`}
+              id={`player-${player.id}`}
+              key={player.id}
+            >
               <div className="player-card-head">
                 <div className="player-name-line">
                   <button
@@ -1635,10 +1639,11 @@ function PlayerEditor({
                   <button
                     className="collapse-button"
                     type="button"
+                    aria-label={`${player.name} ${playerCollapsed ? "펼치기" : "접기"}`}
                     aria-expanded={!playerCollapsed}
+                    title={playerCollapsed ? "플레이어 펼치기" : "플레이어 접기"}
                     onClick={() => toggleCollapsedPlayer(player.id)}
                   >
-                    <span>캐릭터</span>
                     <CoolIcon
                       name="chevron"
                       className={`fold-icon inline ${playerCollapsed ? "" : "expanded"}`}

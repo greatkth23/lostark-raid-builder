@@ -2254,7 +2254,7 @@ button:disabled {
   .member-heading {
     min-width: 0;
     gap: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
   }
 
   .member-heading-actions {
@@ -2275,9 +2275,16 @@ button:disabled {
     white-space: normal;
   }
 
+  .member-heading-actions > .dark-button {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
+
   .player-stack {
     min-width: 0;
-    gap: 18px;
+    gap: 0;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
   }
 
   .player-card {
@@ -2290,21 +2297,35 @@ button:disabled {
 
   .player-card + .player-card {
     border-top: 1px solid var(--line);
-    padding-top: 18px;
+    padding-top: 10px;
   }
 
   .player-card-head {
     min-width: 0;
     min-height: 0;
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
     gap: 6px;
     border-bottom: 0;
     padding: 4px 0 8px;
   }
 
-  .player-name-line,
-  .player-head-right {
-    width: 100%;
+  .player-card.collapsed .player-card-head {
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+
+  .player-name-line {
+    width: auto;
     min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .player-head-right {
+    width: auto;
+    min-width: 0;
+    flex: 0 0 auto;
   }
 
   .plain-title-input,
