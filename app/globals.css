@@ -56,8 +56,8 @@ button:disabled {
 
 .gold-image-icon {
   display: inline-block;
-  width: calc(1em + 2px);
-  height: calc(1em + 2px);
+  width: calc(1em + 4px);
+  height: calc(1em + 4px);
   flex: 0 0 auto;
   border-radius: 0;
   background-position: center;
@@ -409,8 +409,8 @@ button:disabled {
 }
 
 .raid-status-gold-total .gold-image-icon {
-  width: 19px;
-  height: 19px;
+  width: 21px;
+  height: 21px;
 }
 
 .raid-status-character-list {
@@ -447,7 +447,7 @@ button:disabled {
 
 .raid-status-character-name-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 82px;
+  grid-template-columns: minmax(0, 1fr) 86px;
   width: 100%;
   align-items: center;
   gap: 6px;
@@ -462,8 +462,8 @@ button:disabled {
 
 .gold-preference-control {
   display: grid;
-  grid-template-columns: 22px 28px 22px;
-  width: 78px;
+  grid-template-columns: 24px 28px 24px;
+  width: 82px;
   align-items: center;
   justify-self: end;
   gap: 3px;
@@ -476,7 +476,7 @@ button:disabled {
   background: transparent;
   padding: 0;
   color: #8a95a5;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 16px;
   text-align: center;
@@ -485,6 +485,10 @@ button:disabled {
 .gold-preference-label.active {
   color: #27364d;
   font-weight: 700;
+}
+
+.gold-preference-label:first-child {
+  margin-right: 1px;
 }
 
 .gold-preference-switch {
@@ -579,8 +583,8 @@ button:disabled {
 }
 
 .raid-status-check-copy .gold-image-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 .raid-status-check input {
