@@ -52,6 +52,7 @@ const LEGACY_STORAGE_KEYS = [
   "lostark-raid-builder-v1",
 ];
 const API_KEY_STORAGE_KEY = "lostark-openapi-jwt";
+const FAVORITE_PLAYERS_STORAGE_KEY = "loiar-favorite-players-v1";
 
 const TABS: Array<{ id: TabKey; label: string }> = [
   { id: "players", label: "멤버 목록" },
@@ -73,10 +74,11 @@ const ICON_PATHS = {
   settings: "/icons/settings.svg",
   sparkle: "/icons/sparkle.svg",
   sliders: "/icons/sliders.svg",
+  star: "/icons/star.svg",
+  starFilled: "/icons/star-filled.svg",
   support: "/icons/support.svg",
   trash: "/icons/trash.svg",
   undo: "/icons/undo.svg",
-  user: "/icons/user.svg",
 } as const;
 
 type IconName = keyof typeof ICON_PATHS;
@@ -125,6 +127,9 @@ export default function Home() {
   const [notice, setNotice] = useState("");
   const [syncingId, setSyncingId] = useState("");
   const [pendingScrollPlayerId, setPendingScrollPlayerId] = useState("");
+  const [favoritePlayersByRoom, setFavoritePlayersByRoom] = useState<
+    Record<string, string>
+  >({});
   const roomRef = useRef<RaidGroupRoom | null>(null);
   const raidWeekRef = useRef("");
   const nameEditingRef = useRef(false);
@@ -255,8 +260,28 @@ export default function Home() {
     [loadSharedState],
   );
 
+  const toggleFavoritePlayer = useCallback((playerId: string) => {
+    const currentRoom = roomRef.current;
+    if (!currentRoom) return;
+
+    setFavoritePlayersByRoom((current) => {
+      const next = { ...current };
+      if (next[currentRoom.id] === playerId) {
+        delete next[currentRoom.id];
+      } else {
+        next[currentRoom.id] = playerId;
+      }
+      window.localStorage.setItem(
+        FAVORITE_PLAYERS_STORAGE_KEY,
+        JSON.stringify(next),
+      );
+      return next;
+    });
+  }, []);
+
   const fingerprint = useMemo(() => JSON.stringify(players), [players]);
   const isPlanStale = Boolean(generatedPlan) && generatedFingerprint !== fingerprint;
+  const favoritePlayerId = room ? favoritePlayersByRoom[room.id] ?? "" : "";
 
   const characterInputs = useMemo<CharacterInput[]>(
     () =>
@@ -286,9 +311,30 @@ export default function Home() {
         window.localStorage.getItem(STORAGE_KEY) ??
         LEGACY_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(Boolean);
       const storedApiKey = window.localStorage.getItem(API_KEY_STORAGE_KEY);
+      const storedFavoritePlayers = window.localStorage.getItem(
+        FAVORITE_PLAYERS_STORAGE_KEY,
+      );
 
       if (storedApiKey) {
         setApiKey(storedApiKey);
+      }
+
+      if (storedFavoritePlayers) {
+        try {
+          const parsed = JSON.parse(storedFavoritePlayers) as unknown;
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            setFavoritePlayersByRoom(
+              Object.fromEntries(
+                Object.entries(parsed).filter(
+                  (entry): entry is [string, string] =>
+                    typeof entry[1] === "string",
+                ),
+              ),
+            );
+          }
+        } catch {
+          window.localStorage.removeItem(FAVORITE_PLAYERS_STORAGE_KEY);
+        }
       }
 
       if (stored) {
@@ -753,6 +799,7 @@ export default function Home() {
 
         {activeTab === "players" ? (
           <PlayerEditor
+            favoritePlayerId={favoritePlayerId}
             players={players}
             syncingId={syncingId}
             raidWeek={raidWeek}
@@ -773,6 +820,7 @@ export default function Home() {
             onSetCompletion={setRaidCompletion}
             onResetCompletions={resetRaidCompletions}
             onToggleRaid={toggleRaid}
+            onToggleFavorite={toggleFavoritePlayer}
           />
         ) : (
           <ResultPanel
@@ -1320,6 +1368,7 @@ function mergeRosterIntoExpedition(
 }
 
 function PlayerEditor({
+  favoritePlayerId,
   players,
   syncingId,
   raidWeek,
@@ -1340,7 +1389,9 @@ function PlayerEditor({
   onSetCompletion,
   onResetCompletions,
   onToggleRaid,
+  onToggleFavorite,
 }: {
+  favoritePlayerId: string;
   players: Player[];
   syncingId: string;
   raidWeek: string;
@@ -1395,6 +1446,7 @@ function PlayerEditor({
     raidName: string,
     checked: boolean,
   ) => void;
+  onToggleFavorite: (playerId: string) => void;
 }) {
   const [editingPlayers, setEditingPlayers] = useState<
     Map<string, { initialValue: string; value: string }>
@@ -1409,6 +1461,11 @@ function PlayerEditor({
     playerId: string;
     expeditionId: string;
   } | null>(null);
+  const displayedPlayers = useMemo(() => {
+    const favorite = players.find((player) => player.id === favoritePlayerId);
+    if (!favorite) return players;
+    return [favorite, ...players.filter((player) => player.id !== favorite.id)];
+  }, [favoritePlayerId, players]);
 
   const hasActiveNameEdit =
     editingPlayers.size > 0 || editingExpeditions.size > 0;
@@ -1525,15 +1582,25 @@ function PlayerEditor({
       </div>
 
       <div className="player-stack">
-        {players.map((player) => {
+        {displayedPlayers.map((player) => {
           const playerCollapsed = collapsedPlayers.has(player.id);
           const playerNameDraft = editingPlayers.get(player.id);
+          const isFavorite = player.id === favoritePlayerId;
 
           return (
             <article className="player-card" id={`player-${player.id}`} key={player.id}>
               <div className="player-card-head">
                 <div className="player-name-line">
-                  <CoolIcon name="user" className="user-circle-icon" />
+                  <button
+                    className={`favorite-player-button${isFavorite ? " active" : ""}`}
+                    type="button"
+                    aria-label={`${player.name} ${isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}`}
+                    aria-pressed={isFavorite}
+                    title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}
+                    onClick={() => onToggleFavorite(player.id)}
+                  >
+                    <CoolIcon name={isFavorite ? "starFilled" : "star"} />
+                  </button>
                   {playerNameDraft ? (
                     <input
                       aria-label="플레이어명"
@@ -2132,11 +2199,56 @@ function IntegratedCharacterCard({
   ) => void;
 }) {
   const [editingRaids, setEditingRaids] = useState(false);
+  const [raidPopoverStyle, setRaidPopoverStyle] = useState<CSSProperties>({});
+  const raidPopoverRef = useRef<HTMLDivElement>(null);
+  const raidPopoverButtonRef = useRef<HTMLButtonElement>(null);
+  const raidPopoverId = `raid-popover-${character.id}`;
   const supportCapable = isSupportClass(character.className);
   const recommendedRaids = new Set(
     getGoldRecommendedRaidNames(character.selectedRaids, character.goldPreference),
   );
   const completedGold = getCharacterRecommendedGold(character, raidWeek, true);
+
+  useEffect(() => {
+    const popover = raidPopoverRef.current;
+    if (!popover) return;
+    const handleToggle = () => {
+      setEditingRaids(popover.matches(":popover-open"));
+    };
+    popover.addEventListener("toggle", handleToggle);
+    return () => popover.removeEventListener("toggle", handleToggle);
+  }, []);
+
+  const toggleRaidPopover = () => {
+    const popover = raidPopoverRef.current;
+    const button = raidPopoverButtonRef.current;
+    if (!popover || !button) return;
+    if (popover.matches(":popover-open")) {
+      popover.hidePopover();
+      return;
+    }
+
+    const buttonRect = button.getBoundingClientRect();
+    const viewportMargin = 12;
+    const width = Math.min(320, window.innerWidth - viewportMargin * 2);
+    const maxHeight = Math.min(420, window.innerHeight - viewportMargin * 2);
+    const estimatedHeight = Math.min(360, maxHeight);
+    const left = Math.min(
+      Math.max(viewportMargin, buttonRect.left),
+      window.innerWidth - width - viewportMargin,
+    );
+    const top = Math.max(
+      viewportMargin,
+      buttonRect.top - estimatedHeight - 8,
+    );
+
+    setRaidPopoverStyle({ left, top, width, maxHeight });
+    window.requestAnimationFrame(() => {
+      if (popover.isConnected && !popover.matches(":popover-open")) {
+        popover.showPopover();
+      }
+    });
+  };
 
   return (
     <article className="integrated-character-card">
@@ -2230,25 +2342,47 @@ function IntegratedCharacterCard({
         )}
       </div>
 
-      {editingRaids ? (
-        <CompactRaidSelector
-          player={player}
-          expedition={expedition}
-          character={character}
-          onToggleRaid={onToggleRaid}
-        />
-      ) : null}
-
       <footer className="integrated-character-footer">
-        <button
-          className="square-add-button"
-          type="button"
-          aria-expanded={editingRaids}
-          aria-label={editingRaids ? "레이드 편집 닫기" : "레이드 추가"}
-          onClick={() => setEditingRaids((current) => !current)}
-        >
-          <CoolIcon name={editingRaids ? "close" : "add"} />
-        </button>
+        <div className="raid-popover-control">
+          <button
+            ref={raidPopoverButtonRef}
+            className="square-add-button"
+            type="button"
+            aria-controls={raidPopoverId}
+            aria-expanded={editingRaids}
+            aria-haspopup="dialog"
+            aria-label={editingRaids ? "레이드 편집 닫기" : "레이드 추가"}
+            onClick={toggleRaidPopover}
+          >
+            <CoolIcon name={editingRaids ? "close" : "add"} />
+          </button>
+          <div
+            ref={raidPopoverRef}
+            id={raidPopoverId}
+            className="compact-raid-popover"
+            popover="auto"
+            role="dialog"
+            aria-label={`${character.name || "캐릭터"} 레이드 추가`}
+            style={raidPopoverStyle}
+          >
+            <div className="compact-raid-popover-head">
+              <strong>레이드 추가</strong>
+              <button
+                type="button"
+                aria-label="레이드 추가 메뉴 닫기"
+                onClick={() => raidPopoverRef.current?.hidePopover()}
+              >
+                <CoolIcon name="close" />
+              </button>
+            </div>
+            <CompactRaidSelector
+              player={player}
+              expedition={expedition}
+              character={character}
+              onToggleRaid={onToggleRaid}
+            />
+          </div>
+        </div>
         <span className="gold-preference-control" aria-label="골드 추천 기준">
           <button
             type="button"

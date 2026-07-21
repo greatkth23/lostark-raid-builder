@@ -10,6 +10,7 @@ const CLOUDFLARE_D1_DATABASE_ID = "df969583-75a9-44b3-b774-a56ae8bb756d";
 const { d1, r2 } = hostingConfig;
 
 const localBindingConfig = {
+  name: "loiar",
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
   d1_databases: d1

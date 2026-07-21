@@ -93,6 +93,7 @@ button:disabled {
   display: block;
   width: auto;
   height: 48px;
+  margin-left: -13px;
 }
 
 .workspace-shell {
@@ -739,11 +740,35 @@ button:disabled {
   gap: 8px;
 }
 
-.user-circle-icon {
+.favorite-player-button {
+  display: inline-grid;
   width: 27px;
   height: 27px;
   flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: #4e5e75;
+  padding: 0;
+}
+
+.favorite-player-button .cool-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.favorite-player-button.active {
+  color: #f5b301;
+}
+
+.favorite-player-button:hover {
+  background: #fff8dc;
+}
+
+.favorite-player-button:focus-visible {
+  outline: 2px solid rgb(245 179 1 / 30%);
+  outline-offset: 2px;
 }
 
 .plain-title-input,
@@ -1762,7 +1787,7 @@ button:disabled {
   min-height: 28px;
 }
 
-.user-circle-icon {
+.favorite-player-button {
   width: 24px;
   height: 24px;
 }
@@ -2052,6 +2077,62 @@ button:disabled {
   padding-top: 12px;
 }
 
+.raid-popover-control {
+  position: relative;
+}
+
+.compact-raid-popover {
+  position: fixed;
+  inset: auto;
+  z-index: 100;
+  margin: 0;
+  overflow-y: auto;
+  border: 1px solid #cfd8e5;
+  border-radius: 10px;
+  background: #ffffff;
+  padding: 12px;
+  box-shadow: 0 18px 42px rgb(15 23 42 / 20%);
+}
+
+.compact-raid-popover::backdrop {
+  background: transparent;
+}
+
+.compact-raid-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.compact-raid-popover-head strong {
+  color: #182230;
+  font-size: 14px;
+}
+
+.compact-raid-popover-head button {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #66758b;
+  padding: 0;
+}
+
+.compact-raid-popover-head button:hover {
+  background: #f2f4f7;
+}
+
+.compact-raid-popover .compact-raid-selector {
+  margin-top: 0;
+  border-top: 0;
+  padding-top: 0;
+}
+
 .compact-raid-family {
   display: grid;
   gap: 5px;
@@ -2140,4 +2221,226 @@ button:disabled {
 
 .expedition-name-text {
   min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .brand-header-inner {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .workspace-shell {
+    padding-right: 12px !important;
+    padding-left: 12px !important;
+  }
+
+  .tab-strip {
+    margin-right: -12px;
+    margin-left: -12px;
+    overflow-x: auto;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .member-shell {
+    min-width: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .member-heading {
+    min-width: 0;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .member-heading-actions {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(100%, 150px), 1fr)
+    );
+  }
+
+  .member-heading-actions > button,
+  .player-footer-actions button,
+  .expedition-actions button {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .player-stack {
+    min-width: 0;
+    gap: 18px;
+  }
+
+  .player-card {
+    min-width: 0;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .player-card + .player-card {
+    border-top: 1px solid var(--line);
+    padding-top: 18px;
+  }
+
+  .player-card-head {
+    min-width: 0;
+    min-height: 0;
+    gap: 6px;
+    border-bottom: 0;
+    padding: 4px 0 8px;
+  }
+
+  .player-name-line,
+  .player-head-right {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .plain-title-input,
+  .plain-title-text {
+    max-width: 100%;
+  }
+
+  .plain-title-input {
+    width: 0;
+    flex: 1 1 auto;
+  }
+
+  .plain-title-text,
+  .expedition-name-text,
+  .expedition-meta {
+    overflow-wrap: anywhere;
+  }
+
+  .expedition-stack {
+    min-width: 0;
+    gap: 12px;
+    padding: 6px 0 0;
+  }
+
+  .expedition-block {
+    min-width: 0;
+  }
+
+  .expedition-head {
+    min-width: 0;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .expedition-head > div:first-child,
+  .expedition-title-line,
+  .expedition-meta {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .expedition-name-input {
+    width: 0;
+    min-width: 0;
+    max-width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .expedition-actions {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .integrated-character-grid {
+    display: block;
+    min-width: 0;
+    padding: 0 12px 12px;
+  }
+
+  .integrated-character-card {
+    min-width: 0;
+    min-height: 0;
+    border: 0;
+    border-top: 1px solid #dbe3ed;
+    border-radius: 0;
+    background: transparent;
+    padding: 14px 0;
+    box-shadow: none;
+  }
+
+  .integrated-character-head,
+  .integrated-character-identity,
+  .integrated-character-name-row,
+  .integrated-character-badge-row,
+  .integrated-raid-list,
+  .integrated-raid-card,
+  .integrated-raid-copy,
+  .integrated-character-footer {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .integrated-character-meta,
+  .integrated-character-footer,
+  .gold-breakdown {
+    flex-wrap: wrap;
+  }
+
+  .gold-breakdown {
+    white-space: normal;
+  }
+
+  .integrated-raid-copy > strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .integrated-character-grid > .restore-character-control {
+    width: 100%;
+    min-width: 0;
+    margin-top: 4px;
+  }
+
+  .restore-character-menu {
+    width: min(240px, calc(100vw - 48px));
+    max-width: calc(100vw - 48px);
+  }
+
+  .player-footer-actions {
+    min-width: 0;
+    gap: 8px;
+    border-top: 0;
+    background: transparent;
+    padding: 10px 0 0;
+  }
+
+  .player-footer-actions > div {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(100%, 150px), 1fr)
+    );
+  }
+
+  .player-delete-button {
+    margin-left: 0;
+    align-self: flex-start;
+  }
+
+  .compact-raid-popover {
+    max-width: calc(100vw - 24px);
+  }
 }

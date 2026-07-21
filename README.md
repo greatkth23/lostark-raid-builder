@@ -49,6 +49,8 @@ npm run build
 
 이 앱은 `/api/lostark/roster`와 D1을 사용하므로 GitHub Pages 같은 정적 호스팅에는 맞지 않습니다. Cloudflare Workers와 D1을 사용합니다.
 
+- 운영 주소는 `https://loiar.rmarkfcl.workers.dev`입니다.
+
 - `.openai/hosting.json`의 논리 D1 바인딩 이름은 `DB`입니다.
 - `vite.config.ts`에는 운영 D1 데이터베이스 이름과 ID가 연결되어 있습니다.
 - 최초 환경에서는 `drizzle/0000_lame_shard.sql`을 원격 D1에 적용한 뒤 배포합니다.
