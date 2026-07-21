@@ -97,23 +97,12 @@ function CoolIcon({
 
 const GOLD_ICON_URL =
   typeof lostarkGoldIcon === "string" ? lostarkGoldIcon : lostarkGoldIcon.src;
-const AERO_ICON_URL = "/lostark_class_aero.png";
 
 function GoldIcon({ className = "" }: { className?: string }) {
   return (
     <span
       className={`gold-image-icon ${className}`.trim()}
       style={{ backgroundImage: `url(${GOLD_ICON_URL})` }}
-      aria-hidden="true"
-    />
-  );
-}
-
-function SiteLogo({ className = "" }: { className?: string }) {
-  return (
-    <span
-      className={`site-logo ${className}`.trim()}
-      style={{ backgroundImage: `url(${AERO_ICON_URL})` }}
       aria-hidden="true"
     />
   );
@@ -659,20 +648,19 @@ export default function Home() {
   }
 
   return (
-    <main className="app-shell">
-      <div className="app-container">
+    <main className="min-h-screen bg-[#f7f8fb] text-[#151923]">
+      <div className="mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-5">
         <header className="app-header">
-          <div className="app-brand-block">
-            <SiteLogo />
-            <div className="app-brand-copy">
-              <p>롸이어 · Lost Ark Raid Organizer</p>
-              <h1>롸이어 : 로스트아크 공격대 자동구성</h1>
-              <div className="metric-row">
-                <span>공격대 {room.name}</span>
-                <span>플레이어 {players.length}</span>
-                <span>원정대 {players.reduce((count, player) => count + player.expeditions.length, 0)}</span>
-                <span>캐릭터 {characterInputs.length}</span>
-              </div>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-[#5b6d86]">Lost Ark Raid Builder</p>
+            <h1 className="text-2xl font-bold leading-8">
+              로스트아크 공격대 자동구성
+            </h1>
+            <div className="metric-row">
+              <span>공격대 {room.name}</span>
+              <span>플레이어 {players.length}</span>
+              <span>원정대 {players.reduce((count, player) => count + player.expeditions.length, 0)}</span>
+              <span>캐릭터 {characterInputs.length}</span>
             </div>
           </div>
 
@@ -832,14 +820,8 @@ function RaidGroupGate({
   return (
     <main className="room-gate-page">
       <section className="room-gate-card">
-        <div className="room-gate-brand">
-          <SiteLogo className="room-gate-logo" />
-          <div>
-            <p className="room-gate-kicker">롸이어 · Lost Ark Raid Organizer</p>
-            <h1>롸이어 : 로스트아크 공격대 자동구성</h1>
-          </div>
-        </div>
-        <h2>공유 공격대에 입장하세요</h2>
+        <p className="room-gate-kicker">Lost Ark Raid Builder</p>
+        <h1>공유 공격대에 입장하세요</h1>
         <p className="room-gate-description">
           같은 공격대 이름과 비밀번호를 사용하는 모두가 멤버 목록과 레이드
           현황을 함께 편집할 수 있습니다.
