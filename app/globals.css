@@ -56,8 +56,8 @@ button:disabled {
 
 .gold-image-icon {
   display: inline-block;
-  width: calc(1em + 6px);
-  height: calc(1em + 6px);
+  width: calc(1em + 1px);
+  height: calc(1em + 1px);
   flex: 0 0 auto;
   border-radius: 0;
   background-position: center;
@@ -409,8 +409,8 @@ button:disabled {
 }
 
 .raid-status-gold-total .gold-image-icon {
-  width: 23px;
-  height: 23px;
+  width: 18px;
+  height: 18px;
 }
 
 .raid-status-character-list {
@@ -584,8 +584,8 @@ button:disabled {
 }
 
 .raid-status-check-copy .gold-image-icon {
-  width: 18px;
-  height: 18px;
+  width: 13px;
+  height: 13px;
 }
 
 .raid-status-check input {
