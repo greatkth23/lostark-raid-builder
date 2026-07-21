@@ -1730,35 +1730,52 @@ button:disabled {
 
 .integrated-character-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
 }
 
 .integrated-character-identity {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 6px;
+}
+
+.integrated-character-name-row,
+.integrated-character-badge-row {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 7px;
 }
 
-.integrated-character-identity > .cool-icon {
+.integrated-character-badge-row {
+  flex-wrap: wrap;
+}
+
+.integrated-character-name-row > .cool-icon {
   width: 13px;
   height: 13px;
+  flex: 0 0 auto;
   color: #53647b;
 }
 
-.integrated-character-identity > strong {
-  overflow: hidden;
+.integrated-character-name-row > strong {
   min-width: 0;
   font-size: 15px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  white-space: normal;
 }
 
 .integrated-character-identity .class-pill-text {
+  flex: 0 0 auto;
+  max-width: 100%;
   padding: 3px 8px;
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .single-role-button {

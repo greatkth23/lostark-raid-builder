@@ -2025,25 +2025,29 @@ function IntegratedCharacterCard({
     <article className="integrated-character-card">
       <header className="integrated-character-head">
         <div className="integrated-character-identity">
-          <CoolIcon name={character.role === "support" ? "support" : "dealer"} />
-          <strong>{character.name || "캐릭터명"}</strong>
-          <span className="class-pill-text">{character.className || "직업 없음"}</span>
-          {supportCapable ? (
-            <button
-              className={`single-role-button ${character.role === "support" ? "support-option" : "dealer-option"}`}
-              type="button"
-              onClick={() =>
-                onSetRole(
-                  player.id,
-                  expedition.id,
-                  character.id,
-                  character.role === "support" ? "dealer" : "support",
-                )
-              }
-            >
-              {character.role === "support" ? "서폿" : "딜러"}
-            </button>
-          ) : null}
+          <div className="integrated-character-name-row">
+            <CoolIcon name={character.role === "support" ? "support" : "dealer"} />
+            <strong>{character.name || "캐릭터명"}</strong>
+          </div>
+          <div className="integrated-character-badge-row">
+            <span className="class-pill-text">{character.className || "직업 없음"}</span>
+            {supportCapable ? (
+              <button
+                className={`single-role-button ${character.role === "support" ? "support-option" : "dealer-option"}`}
+                type="button"
+                onClick={() =>
+                  onSetRole(
+                    player.id,
+                    expedition.id,
+                    character.id,
+                    character.role === "support" ? "dealer" : "support",
+                  )
+                }
+              >
+                {character.role === "support" ? "서폿" : "딜러"}
+              </button>
+            ) : null}
+          </div>
         </div>
         <button
           className="integrated-character-delete"
