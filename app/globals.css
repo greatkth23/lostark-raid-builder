@@ -447,7 +447,7 @@ button:disabled {
 
 .raid-status-character-name-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 86px;
+  grid-template-columns: minmax(0, 1fr) 98px;
   width: 100%;
   align-items: center;
   gap: 6px;
@@ -462,8 +462,8 @@ button:disabled {
 
 .gold-preference-control {
   display: grid;
-  grid-template-columns: 24px 28px 24px;
-  width: 82px;
+  grid-template-columns: 30px 28px 30px;
+  width: 94px;
   align-items: center;
   justify-self: end;
   gap: 3px;
@@ -480,6 +480,7 @@ button:disabled {
   font-weight: 600;
   line-height: 16px;
   text-align: center;
+  white-space: nowrap;
 }
 
 .gold-preference-label.active {
