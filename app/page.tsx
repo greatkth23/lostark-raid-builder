@@ -1780,6 +1780,7 @@ function ExpeditionBlock({
           </div>
           <div className="expedition-meta">
             <span>{expedition.serverName || "서버 미지정"}</span>
+            <span aria-hidden="true">·</span>
             <span>대표 {expedition.representativeName || "대표 캐릭터 없음"}</span>
             <span>· 캐릭터 {expedition.characters.length}명</span>
             {expedition.lastSyncedAt ? (

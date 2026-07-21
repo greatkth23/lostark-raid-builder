@@ -67,6 +67,38 @@ button:disabled {
   vertical-align: -0.12em;
 }
 
+.brand-header {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 50;
+  height: 56px;
+  border-bottom: 1px solid var(--line);
+  background: rgb(255 255 255 / 97%);
+  backdrop-filter: blur(8px);
+}
+
+.brand-header-inner {
+  display: flex;
+  width: 100%;
+  max-width: 1400px;
+  height: 100%;
+  align-items: center;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.brand-header img {
+  display: block;
+  width: auto;
+  height: 48px;
+}
+
+.workspace-shell {
+  padding-top: 76px !important;
+}
+
 .app-header {
   display: block;
   padding: 2px 0 0;
@@ -121,7 +153,7 @@ button:disabled {
   background: #ffffff;
   color: #536176;
   padding: 0;
-  font-size: 17px;
+  font-size: 20px;
 }
 
 .header-icon-button:hover {
@@ -162,14 +194,14 @@ button:disabled {
 
 .tab-strip {
   position: sticky;
-  top: 0;
+  top: 56px;
   z-index: 30;
   display: flex;
   gap: 24px;
   align-items: flex-end;
   margin-right: -24px;
   margin-left: -24px;
-  overflow-x: auto;
+  overflow: visible;
   border-bottom: 1px solid var(--line);
   background: rgb(247 248 251 / 96%);
   padding: 0 24px;
@@ -264,7 +296,7 @@ button:disabled {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 80px 24px 24px;
   background:
     radial-gradient(circle at top left, rgba(55, 92, 160, 0.14), transparent 32rem),
     #f4f6fa;
@@ -1349,7 +1381,7 @@ button:disabled {
 
 .settings-field {
   display: grid;
-  gap: 8px;
+  gap: 3px;
   color: #334155;
   font-size: 12px;
   font-weight: 500;
@@ -2096,4 +2128,16 @@ button:disabled {
     grid-template-columns: minmax(0, 1fr);
     padding: 0 10px 12px;
   }
+}
+
+.settings-field {
+  gap: 8px;
+}
+
+.expedition-title-line {
+  gap: 3px;
+}
+
+.expedition-name-text {
+  min-width: 0;
 }
