@@ -1138,7 +1138,6 @@ function RaidStatusPanel({
                                     <span className="raid-status-check-copy">
                                       <span>{raidName}</span>
                                       <small>
-                                        <GoldIcon />
                                         {raid.gold.toLocaleString("ko-KR")} (
                                         {raid.tradableGold.toLocaleString("ko-KR")} + {raid.boundGold.toLocaleString("ko-KR")})
                                       </small>
@@ -1870,8 +1869,12 @@ function ExpeditionBlock({
           </div>
           <div className="expedition-gold-progress">
             <GoldIcon />
-            <strong>{goldProgress.earned.toLocaleString("ko-KR")}G</strong>
-            <span>/ {goldProgress.available.toLocaleString("ko-KR")}G</span>
+            <span className="expedition-gold-earned">
+              {goldProgress.earned.toLocaleString("ko-KR")}G
+            </span>
+            <span className="expedition-gold-available">
+              / {goldProgress.available.toLocaleString("ko-KR")}G
+            </span>
           </div>
         </div>
         <div className="expedition-actions">
@@ -2095,11 +2098,17 @@ function getExpeditionTradableGoldProgress(
   );
 }
 
-function GoldBreakdown({ totals }: { totals: GoldTotals }) {
+function GoldBreakdown({
+  totals,
+  showIcon = true,
+}: {
+  totals: GoldTotals;
+  showIcon?: boolean;
+}) {
   return (
     <span className="gold-breakdown">
-      <GoldIcon />
-      <strong>{totals.total.toLocaleString("ko-KR")}G</strong>
+      {showIcon ? <GoldIcon /> : null}
+      <span>{totals.total.toLocaleString("ko-KR")}G</span>
       <span>
         ({totals.tradable.toLocaleString("ko-KR")} + {totals.bound.toLocaleString("ko-KR")})
       </span>
@@ -2327,6 +2336,7 @@ function IntegratedCharacterCard({
                 <span className="integrated-raid-copy">
                   <strong>{raidName}</strong>
                   <GoldBreakdown
+                    showIcon={false}
                     totals={{
                       total: raid.gold,
                       tradable: raid.tradableGold,

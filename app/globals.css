@@ -639,9 +639,9 @@ button:disabled {
 }
 
 .raid-status-check.completed {
-  border-color: #accfbd;
-  color: #3f6f56;
-  background: #eff8f3;
+  border-color: #d1d5db;
+  color: #6b7280;
+  background: #f3f4f6;
 }
 
 .raid-status-check.completed .raid-status-check-copy {
@@ -665,7 +665,6 @@ button:disabled {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: #8a6726;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -679,7 +678,7 @@ button:disabled {
 .raid-status-check input {
   width: 17px;
   height: 17px;
-  accent-color: #3f805d;
+  accent-color: #6b7280;
 }
 
 .raid-completion-indicator {
@@ -1851,14 +1850,12 @@ button:disabled {
   height: 11px;
 }
 
-.expedition-gold-progress strong,
-.gold-breakdown strong {
-  color: #e48700;
-  font-weight: 700;
+.expedition-gold-earned {
+  color: #d97706;
+  font-weight: 600;
 }
 
-.expedition-gold-progress span,
-.gold-breakdown > span {
+.expedition-gold-available {
   color: #68758a;
 }
 
@@ -2016,12 +2013,17 @@ button:disabled {
 }
 
 .integrated-raid-card.completed {
-  border-color: #accfbd;
-  background: #eff8f3;
+  border-color: #d1d5db;
+  color: #6b7280;
+  background: #f3f4f6;
 }
 
 .integrated-raid-card.completed .integrated-raid-copy {
-  opacity: 0.72;
+  color: #6b7280;
+}
+
+.integrated-raid-card.completed .integrated-raid-copy > strong {
+  color: #6b7280;
 }
 
 .integrated-raid-copy {
@@ -2046,7 +2048,7 @@ button:disabled {
 .integrated-raid-card input {
   width: 18px;
   height: 18px;
-  accent-color: #3f805d;
+  accent-color: #6b7280;
 }
 
 .integrated-raid-card.recommended .raid-completion-indicator {
