@@ -44,6 +44,28 @@ export function ensureDatabase() {
         d1.prepare(
           "CREATE INDEX IF NOT EXISTS raid_group_sessions_expiry_idx ON raid_group_sessions (expires_at)",
         ),
+        d1.prepare(`
+          CREATE TABLE IF NOT EXISTS lostark_roster_cache (
+            character_key TEXT PRIMARY KEY NOT NULL,
+            data_json TEXT NOT NULL,
+            expires_at INTEGER NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+          )
+        `),
+        d1.prepare(
+          "CREATE INDEX IF NOT EXISTS lostark_roster_cache_expiry_idx ON lostark_roster_cache (expires_at)",
+        ),
+        d1.prepare(`
+          CREATE TABLE IF NOT EXISTS lostark_api_usage (
+            scope TEXT NOT NULL,
+            window_start INTEGER NOT NULL,
+            request_count INTEGER NOT NULL,
+            PRIMARY KEY (scope, window_start)
+          )
+        `),
+        d1.prepare(
+          "CREATE INDEX IF NOT EXISTS lostark_api_usage_window_idx ON lostark_api_usage (window_start)",
+        ),
       ])
       .catch((error: unknown) => {
         initialization = null;

@@ -1,5 +1,11 @@
 import { sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 
 export const raidGroups = sqliteTable("raid_groups", {
   id: text("id").primaryKey(),
@@ -25,5 +31,29 @@ export const raidGroupSessions = sqliteTable(
   (table) => [
     index("raid_group_sessions_group_idx").on(table.raidGroupId),
     index("raid_group_sessions_expiry_idx").on(table.expiresAt),
+  ],
+);
+
+export const lostarkRosterCache = sqliteTable(
+  "lostark_roster_cache",
+  {
+    characterKey: text("character_key").primaryKey(),
+    dataJson: text("data_json").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [index("lostark_roster_cache_expiry_idx").on(table.expiresAt)],
+);
+
+export const lostarkApiUsage = sqliteTable(
+  "lostark_api_usage",
+  {
+    scope: text("scope").notNull(),
+    windowStart: integer("window_start").notNull(),
+    requestCount: integer("request_count").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.scope, table.windowStart] }),
+    index("lostark_api_usage_window_idx").on(table.windowStart),
   ],
 );

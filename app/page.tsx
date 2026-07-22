@@ -58,6 +58,17 @@ type RosterCharacter = {
   combatPower: number;
 };
 
+class RosterFetchError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public retryAfterSeconds?: number,
+  ) {
+    super(message);
+    this.name = "RosterFetchError";
+  }
+}
+
 type TabKey = "players" | "results";
 
 const STORAGE_KEY = "lostark-raid-builder-v3";
@@ -65,7 +76,7 @@ const LEGACY_STORAGE_KEYS = [
   "lostark-raid-builder-v2",
   "lostark-raid-builder-v1",
 ];
-const API_KEY_STORAGE_KEY = "lostark-openapi-jwt";
+const LEGACY_API_KEY_STORAGE_KEY = "lostark-openapi-jwt";
 const FAVORITE_PLAYERS_STORAGE_KEY = "loiar-favorite-players-v1";
 
 const TABS: Array<{ id: TabKey; label: string }> = [
@@ -132,10 +143,8 @@ export default function Home() {
   const [raidWeek, setRaidWeek] = useState("");
   const [legacyPlayers, setLegacyPlayers] = useState<Player[] | null>(null);
   const [booting, setBooting] = useState(true);
-  const [apiKey, setApiKey] = useState("");
   const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabKey>("players");
-  const [hydrated, setHydrated] = useState(false);
   const [generatedPlan, setGeneratedPlan] = useState<RaidPlanResult | null>(null);
   const [generatedFingerprint, setGeneratedFingerprint] = useState("");
   const [manualPartyLayout, setManualPartyLayout] = useState<ManualPartyLayout>(
@@ -352,14 +361,11 @@ export default function Home() {
       const stored =
         window.localStorage.getItem(STORAGE_KEY) ??
         LEGACY_STORAGE_KEYS.map((key) => window.localStorage.getItem(key)).find(Boolean);
-      const storedApiKey = window.localStorage.getItem(API_KEY_STORAGE_KEY);
       const storedFavoritePlayers = window.localStorage.getItem(
         FAVORITE_PLAYERS_STORAGE_KEY,
       );
 
-      if (storedApiKey) {
-        setApiKey(storedApiKey);
-      }
+      window.localStorage.removeItem(LEGACY_API_KEY_STORAGE_KEY);
 
       if (storedFavoritePlayers) {
         try {
@@ -396,7 +402,6 @@ export default function Home() {
       }
 
       if (cancelled) return;
-      setHydrated(true);
       setBooting(false);
     };
     void initialize();
@@ -405,12 +410,6 @@ export default function Home() {
       cancelled = true;
     };
   }, [applySnapshot]);
-
-  useEffect(() => {
-    if (hydrated) {
-      window.localStorage.setItem(API_KEY_STORAGE_KEY, apiKey);
-    }
-  }, [apiKey, hydrated]);
 
   useEffect(() => {
     if (!room) return;
@@ -679,11 +678,9 @@ export default function Home() {
   };
 
   const saveAppSettings = async ({
-    apiKey: nextApiKey,
     roomName,
     password,
   }: {
-    apiKey: string;
     roomName: string;
     password: string;
   }) => {
@@ -709,7 +706,6 @@ export default function Home() {
       roomRef.current = payload.room;
       setRoom(payload.room);
     }
-    setApiKey(nextApiKey);
     setNotice("설정을 저장했습니다.");
   };
 
@@ -717,15 +713,20 @@ export default function Home() {
     const response = await fetch("/api/lostark/roster", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ apiKey, characterName: representativeName }),
+      body: JSON.stringify({ characterName: representativeName }),
     });
     const payload = (await response.json()) as {
       characters?: RosterCharacter[];
       message?: string;
+      retryAfterSeconds?: number;
     };
 
     if (!response.ok) {
-      throw new Error(payload.message ?? "원정대 정보를 가져오지 못했습니다.");
+      throw new RosterFetchError(
+        payload.message ?? "원정대 정보를 가져오지 못했습니다.",
+        response.status,
+        payload.retryAfterSeconds,
+      );
     }
 
     return payload.characters ?? [];
@@ -738,11 +739,6 @@ export default function Home() {
     );
 
     if (!player || !expedition) {
-      return;
-    }
-
-    if (!apiKey.trim()) {
-      setNotice("Lost Ark OpenAPI JWT를 입력하세요.");
       return;
     }
 
@@ -773,31 +769,40 @@ export default function Home() {
   };
 
   const syncAllRosters = async () => {
-    if (!apiKey.trim()) {
-      setNotice("Lost Ark OpenAPI JWT를 입력하세요.");
-      return;
-    }
-
+    const targets = players.flatMap((player) =>
+      player.expeditions
+        .filter((expedition) => expedition.representativeName.trim())
+        .map((expedition) => ({ player, expedition })),
+    );
     let syncedCount = 0;
+    let failedCount = 0;
+    let skippedCount = 0;
+    let firstError = "";
     setNotice("전체 정보를 동기화하는 중입니다.");
 
-    for (const player of players) {
-      for (const expedition of player.expeditions) {
-        if (!expedition.representativeName.trim()) {
-          continue;
+    for (let index = 0; index < targets.length; index += 1) {
+      const { player, expedition } = targets[index];
+      try {
+        setSyncingId(`${player.id}:${expedition.id}`);
+        const roster = await fetchRoster(expedition.representativeName);
+        commitOperation({
+          type: "expedition.replace",
+          playerId: player.id,
+          expedition: mergeRosterIntoExpedition(expedition, roster),
+        });
+        syncedCount += 1;
+      } catch (error) {
+        failedCount += 1;
+        if (!firstError) {
+          firstError =
+            error instanceof Error ? error.message : "동기화에 실패했습니다.";
         }
-
-        try {
-          setSyncingId(`${player.id}:${expedition.id}`);
-          const roster = await fetchRoster(expedition.representativeName);
-          commitOperation({
-            type: "expedition.replace",
-            playerId: player.id,
-            expedition: mergeRosterIntoExpedition(expedition, roster),
-          });
-          syncedCount += 1;
-        } catch {
-          // Keep syncing the remaining rosters.
+        if (
+          error instanceof RosterFetchError &&
+          (error.status === 429 || error.status === 503)
+        ) {
+          skippedCount = targets.length - index - 1;
+          break;
         }
       }
     }
@@ -805,7 +810,14 @@ export default function Home() {
     setSyncingId("");
     setGeneratedPlan(null);
     setGeneratedFingerprint("");
-    setNotice(`원정대 ${syncedCount}개를 동기화했습니다.`);
+    const summary = [
+      `원정대 ${syncedCount}개 동기화`,
+      failedCount ? `${failedCount}개 실패` : "",
+      skippedCount ? `${skippedCount}개 보류` : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+    setNotice(`${summary}.${firstError ? ` ${firstError}` : ""}`);
   };
 
   const recomposeParty = () => {
@@ -943,7 +955,6 @@ export default function Home() {
 
         {apiSettingsOpen ? (
           <ApiSettingsModal
-            apiKey={apiKey}
             roomName={room.name}
             onClose={() => setApiSettingsOpen(false)}
             onSave={saveAppSettings}
@@ -1386,21 +1397,17 @@ function getPlayerCompletedGold(player: Player, raidWeek: string) {
 }
 
 function ApiSettingsModal({
-  apiKey,
   roomName,
   onClose,
   onSave,
 }: {
-  apiKey: string;
   roomName: string;
   onClose: () => void;
   onSave: (settings: {
-    apiKey: string;
     roomName: string;
     password: string;
   }) => Promise<void>;
 }) {
-  const [nextApiKey, setNextApiKey] = useState(apiKey);
   const [nextRoomName, setNextRoomName] = useState(roomName);
   const [nextPassword, setNextPassword] = useState("");
   const [error, setError] = useState("");
@@ -1412,7 +1419,6 @@ function ApiSettingsModal({
     setError("");
     try {
       await onSave({
-        apiKey: nextApiKey,
         roomName: nextRoomName.trim(),
         password: nextPassword,
       });
@@ -1440,7 +1446,7 @@ function ApiSettingsModal({
         <div className="settings-modal-head">
           <div>
             <h2 id="api-settings-title">설정</h2>
-            <p>공격대 정보와 Lost Ark OpenAPI를 관리합니다.</p>
+            <p>공격대 이름과 비밀번호를 관리합니다.</p>
           </div>
           <button
             className="settings-close-button"
@@ -1479,18 +1485,6 @@ function ApiSettingsModal({
             onChange={(event) => setNextPassword(event.target.value)}
           />
           <small>기존 비밀번호를 유지하려면 비워 두세요.</small>
-        </label>
-
-        <label className="settings-field">
-          <span>API 키</span>
-          <input
-            className="settings-input"
-            type="password"
-            value={nextApiKey}
-            placeholder="Lost Ark OpenAPI JWT"
-            autoComplete="off"
-            onChange={(event) => setNextApiKey(event.target.value)}
-          />
         </label>
 
         {error ? <div className="settings-error">{error}</div> : null}

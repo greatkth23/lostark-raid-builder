@@ -13,6 +13,9 @@ const localBindingConfig = {
   name: "loiar",
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
+  secrets: {
+    required: ["LOSTARK_API_JWT"],
+  },
   d1_databases: d1
     ? [
         {
