@@ -383,6 +383,7 @@ function PartyCard({ group, groupIndex, completed, displayName, dragging, onDrag
   onToggleComplete: (group: RaidGroup, completed: boolean) => void;
 }) {
   const raid = getRaidDefinition(group.raidName);
+  const arrangedSlots = arrangePartySlots(group);
   return (
     <article
       className={`party-card ${completed ? "completed" : ""} ${dragging && dragging.groupId !== group.id ? "drop-ready" : ""}`.trim()}
@@ -398,37 +399,36 @@ function PartyCard({ group, groupIndex, completed, displayName, dragging, onDrag
       </div>
       <div className="party-capacity"><PartyIcon name="users" /> {group.members.length} / {group.size}명</div>
       <div className="party-roster">
-        {group.members.map((member) => (
-          <div
-            className={`party-character-row ${member.role}`}
-            key={member.id}
-            draggable={!completed}
-            onDragStart={(event) => {
-              event.dataTransfer.effectAllowed = "move";
-              event.dataTransfer.setData("text/plain", `${group.id}:${member.id}`);
-              onDragStart({ memberId: member.id, groupId: group.id });
-            }}
-            onDragEnd={onDragEnd}
-          >
-            <span className="party-role-badge">{roleLabel(member.role)}</span>
-            <span className="party-character-name">{displayName(member)}</span>
-            <span className="party-class-name">{member.className}</span>
-            <span className="party-level">{formatItemLevel(member.itemLevel)}</span>
-            <span className={`party-power ${member.role}`}>
-              <PartyIcon name={member.role === "dealer" ? "dealer" : "shield"} />
-              {Math.trunc(member.combatPower).toLocaleString("ko-KR")}
-            </span>
-            <button type="button" aria-label={`${displayName(member)} 캐릭터 교환`} onClick={() => onOpenSwap(group, member)} disabled={completed}>
-              <ArrowSwapIcon />
+        {arrangedSlots.map(({ role, member }, index) => member ? (
+            <div
+              className={`party-character-row ${member.role}`}
+              key={member.id}
+              draggable={!completed}
+              onDragStart={(event) => {
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", `${group.id}:${member.id}`);
+                onDragStart({ memberId: member.id, groupId: group.id });
+              }}
+              onDragEnd={onDragEnd}
+            >
+              <span className="party-role-badge">{roleLabel(member.role)}</span>
+              <span className="party-character-name">{displayName(member)}</span>
+              <span className="party-class-name">{member.className}</span>
+              <span className="party-level">{formatItemLevel(member.itemLevel)}</span>
+              <span className={`party-power ${member.role}`}>
+                <PartyIcon name={member.role === "dealer" ? "dealer" : "shield"} />
+                {Math.trunc(member.combatPower).toLocaleString("ko-KR")}
+              </span>
+              <button type="button" aria-label={`${displayName(member)} 캐릭터 교환`} onClick={() => onOpenSwap(group, member)} disabled={completed}>
+                <ArrowSwapIcon />
+              </button>
+            </div>
+          ) : (
+            <button className={`party-empty-slot ${role}`} key={`${role}-empty-${index}`} type="button" onClick={() => onOpenAdd(group, role)} disabled={completed}>
+              <span className="party-role-badge">{roleLabel(role)}</span>
+              <span>+ 캐릭터 추가</span>
             </button>
-          </div>
-        ))}
-        {group.externalSlots.map((slot, index) => (
-          <button className={`party-empty-slot ${slot.role}`} key={`${slot.role}-${index}`} type="button" onClick={() => onOpenAdd(group, slot.role)} disabled={completed}>
-            <span className="party-role-badge">{roleLabel(slot.role)}</span>
-            <span>+ 캐릭터 추가</span>
-          </button>
-        ))}
+          ))}
       </div>
       {raid ? (
         <div className="party-card-gold"><GoldIcon /> <span className="party-gold-total">{raid.gold.toLocaleString("ko-KR")}G</span><span>({raid.tradableGold.toLocaleString("ko-KR")} + {raid.boundGold.toLocaleString("ko-KR")})</span></div>
@@ -578,6 +578,24 @@ const getGroupNumberLabel = (groups: RaidGroup[], group: RaidGroup) => {
     .filter((candidate) => candidate.raidName === group.raidName)
     .findIndex((candidate) => candidate.id === group.id);
   return `${group.raidName} ${index + 1}공대`;
+};
+
+const arrangePartySlots = (group: RaidGroup) => {
+  const dealers = group.members.filter((member) => member.role === "dealer");
+  const supports = group.members.filter((member) => member.role === "support");
+  let dealerIndex = 0;
+  let supportIndex = 0;
+  const roleOrder = Array.from(
+    { length: group.size / 4 },
+    () => ["dealer", "dealer", "dealer", "support"] as const,
+  ).flat();
+
+  return roleOrder.map((role) => {
+    const member = role === "dealer"
+      ? dealers[dealerIndex++]
+      : supports[supportIndex++];
+    return { role, member };
+  });
 };
 
 const formatRaidWeekRange = (value: string) => {

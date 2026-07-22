@@ -1800,7 +1800,7 @@ function PlayerEditor({
   return (
     <section className="member-shell">
       <div className="member-heading">
-        <div className="member-title">멤버 목록</div>
+        <h2 className="member-title">멤버 목록</h2>
         <div className="member-heading-actions">
           <button className="ghost-button" type="button" onClick={onSyncAll}>
             <CoolIcon name="refresh" /> 동기화
