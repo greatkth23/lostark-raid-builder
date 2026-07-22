@@ -808,58 +808,12 @@ export default function Home() {
     setNotice(`원정대 ${syncedCount}개를 동기화했습니다.`);
   };
 
-  const updateAndCompose = async () => {
+  const recomposeParty = () => {
     if (updatingParty) return;
     setUpdatingParty(true);
-    setNotice("정보를 갱신하고 파티를 다시 구성하고 있습니다.");
-    const replacements: Array<{ playerId: string; expedition: Expedition }> = [];
-    let failedCount = 0;
-
-    if (apiKey.trim()) {
-      for (const player of players) {
-        for (const expedition of player.expeditions) {
-          if (!expedition.representativeName.trim()) continue;
-          try {
-            setSyncingId(`${player.id}:${expedition.id}`);
-            const roster = await fetchRoster(expedition.representativeName);
-            replacements.push({
-              playerId: player.id,
-              expedition: mergeRosterIntoExpedition(expedition, roster),
-            });
-          } catch {
-            failedCount += 1;
-          }
-        }
-      }
-    }
-
-    const rosterOperation: RaidGroupOperation = {
-      type: "expedition.replaceMany",
-      replacements,
-    };
-    const nextPlayers = applyRaidGroupOperation(players, rosterOperation, raidWeekRef.current);
-    const nextInputs = buildCharacterInputs(nextPlayers, raidWeekRef.current);
-    const reconciled = reconcileManualLayout(manualPartyLayout, nextInputs);
-    const nextPlan = buildRaidPlan(nextInputs, reconciled);
-    const partyLayout = planToManualLayout(nextPlan);
-    const operation: RaidGroupOperation = replacements.length
-      ? { type: "expedition.replaceMany", replacements, partyLayout }
-      : { type: "party.layout.set", partyLayout };
-
-    setPlayers(nextPlayers);
-    setManualPartyLayout(partyLayout);
-    setGeneratedPlan(nextPlan);
-    setGeneratedFingerprint(JSON.stringify(nextPlayers));
-    completedPartyIdsRef.current = new Set();
-    setCompletedPartyIds(completedPartyIdsRef.current);
-    queueMutation(operation);
-    setSyncingId("");
+    generatePlan();
     setUpdatingParty(false);
-    setNotice(
-      apiKey.trim()
-        ? `원정대 ${replacements.length}개를 동기화하고 파티를 구성했습니다.${failedCount ? ` ${failedCount}개는 갱신하지 못했습니다.` : ""}`
-        : "API 키가 없어 기존 정보로 파티만 다시 구성했습니다.",
-    );
+    setNotice("현재 멤버 정보로 파티를 자동 구성했습니다.");
   };
 
   const setRaidCompletion = (
@@ -1051,7 +1005,7 @@ export default function Home() {
             completedPartyIds={effectiveCompletedPartyIds}
             stale={isPlanStale}
             updating={updatingParty}
-            onUpdate={updateAndCompose}
+            onUpdate={recomposeParty}
             onMove={movePlanMember}
             onSwap={swapPlanMember}
             onToggleComplete={setPartyCompletion}
@@ -1374,7 +1328,9 @@ function RaidStatusPanel({
                                         {raid.tradableGold.toLocaleString("ko-KR")} + {raid.boundGold.toLocaleString("ko-KR")})
                                       </small>
                                     </span>
-                                    <span className="raid-completion-indicator">
+                                    <span
+                                      className={`raid-completion-indicator${completed ? " checked" : ""}`}
+                                    >
                                       <input
                                         type="checkbox"
                                         checked={completed}
@@ -1802,14 +1758,35 @@ function PlayerEditor({
       <div className="member-heading">
         <h2 className="member-title">멤버 목록</h2>
         <div className="member-heading-actions">
-          <button className="ghost-button" type="button" onClick={onSyncAll}>
-            <CoolIcon name="refresh" /> 동기화
+          <button
+            className="ghost-button"
+            type="button"
+            aria-label="동기화"
+            title="동기화"
+            onClick={onSyncAll}
+          >
+            <CoolIcon name="refresh" />
+            <span className="member-action-label">동기화</span>
           </button>
-          <button className="ghost-button" type="button" onClick={onResetCompletions}>
-            <CoolIcon name="undo" /> 완료 상태 초기화
+          <button
+            className="ghost-button"
+            type="button"
+            aria-label="완료 상태 초기화"
+            title="완료 상태 초기화"
+            onClick={onResetCompletions}
+          >
+            <CoolIcon name="undo" />
+            <span className="member-action-label">완료 상태 초기화</span>
           </button>
-          <button className="dark-button" type="button" onClick={onAddPlayer}>
-            <CoolIcon name="add" /> 플레이어 추가
+          <button
+            className="dark-button"
+            type="button"
+            aria-label="플레이어 추가"
+            title="플레이어 추가"
+            onClick={onAddPlayer}
+          >
+            <CoolIcon name="add" />
+            <span className="member-action-label">플레이어 추가</span>
           </button>
         </div>
       </div>
@@ -2576,7 +2553,9 @@ function IntegratedCharacterCard({
                     }}
                   />
                 </span>
-                <span className="raid-completion-indicator">
+                <span
+                  className={`raid-completion-indicator${completed ? " checked" : ""}`}
+                >
                   <input
                     type="checkbox"
                     checked={completed}

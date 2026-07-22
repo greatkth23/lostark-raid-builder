@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import lostarkGoldIcon from "../../lostark_gold.png";
-import { RAID_DEFINITIONS, getRaidDefinition, roleLabel, type AssignedMember, type RaidGroup, type RaidPlanResult } from "../lib/raidPlanner";
+import { getRaidDefinition, roleLabel, type AssignedMember, type RaidGroup, type RaidPlanResult } from "../lib/raidPlanner";
 import { allPlanGroups, canPlaceMember, canReplaceMember } from "../lib/partyLayout";
 import type { Player } from "../lib/raidData";
 
@@ -147,7 +147,7 @@ export default function PartyPanel({
         </div>
         <button className="party-update-button" type="button" onClick={onUpdate} disabled={updating}>
           <PartyIcon name="reload" className="party-refresh-icon" />
-          {updating ? "업데이트 중" : "업데이트"}
+          {updating ? "구성 중" : "자동구성"}
         </button>
       </div>
 
@@ -173,7 +173,7 @@ export default function PartyPanel({
       </div>
 
       <p className="party-help">캐릭터를 드래그해서 같은 레이드의 다른 파티 빈자리로 옮기거나, 교환 버튼으로 같은 플레이어의 다른 캐릭터와 바꿀 수 있어요.</p>
-      {stale ? <div className="party-warning">멤버 정보가 변경되었습니다. 업데이트하면 현재 수동 배치를 유지하며 다시 충원합니다.</div> : null}
+      {stale ? <div className="party-warning">멤버 정보가 변경되었습니다. 자동구성하면 현재 수동 배치를 유지하며 다시 충원합니다.</div> : null}
       {plan?.warnings.length ? (
         <div className="party-warning">{plan.warnings.join(" ")}</div>
       ) : null}
@@ -181,7 +181,7 @@ export default function PartyPanel({
       {!plan || groups.length === 0 ? (
         <div className="party-empty">
           <strong>구성할 레이드가 없습니다.</strong>
-          <span>멤버 목록에서 레이드를 선택한 뒤 업데이트해 주세요.</span>
+          <span>멤버 목록에서 레이드를 선택한 뒤 자동구성을 눌러 주세요.</span>
         </div>
       ) : viewMode === "raid" ? (
         <div className="party-family-list">
@@ -298,12 +298,10 @@ function RaidFamilySection({ family, groups, completedPartyIds, displayName, dra
   onOpenAdd: (group: RaidGroup, role: AssignedMember["role"]) => void;
   onToggleComplete: (group: RaidGroup, completed: boolean) => void;
 }) {
-  const familyRaids = RAID_DEFINITIONS.filter((raid) => raid.family === family);
-  const maximumGold = Math.max(0, ...familyRaids.map((raid) => raid.gold));
   return (
     <section className="party-family-section">
       <header>
-        <div><h3>{family}</h3><span>{maximumGold.toLocaleString("ko-KR")}G~</span></div>
+        <div><h3>{family}</h3></div>
       </header>
       <div className="party-card-row">
         {groups.map((group) => (
@@ -398,7 +396,7 @@ function PartyCard({ group, groupIndex, completed, displayName, dragging, onDrag
         </button>
       </div>
       <div className="party-capacity"><PartyIcon name="users" /> {group.members.length} / {group.size}명</div>
-      <div className="party-roster">
+      <div className={`party-roster${group.size === 8 ? " eight-person" : ""}`}>
         {arrangedSlots.map(({ role, member }, index) => member ? (
             <div
               className={`party-character-row ${member.role}`}
