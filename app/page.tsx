@@ -2028,6 +2028,8 @@ function ExpeditionBlock({
 }) {
   const [restoreOpen, setRestoreOpen] = useState(false);
   const restorableCharacters = getRestorableCharacters(expedition);
+  const needsRepresentativeSetup =
+    !expedition.representativeName.trim() && expedition.characters.length === 0;
   const goldProgress = getExpeditionTradableGoldProgress(expedition, raidWeek);
 
   return (
@@ -2064,7 +2066,11 @@ function ExpeditionBlock({
           <div className="expedition-meta">
             <span>{expedition.serverName || "서버 미지정"}</span>
             <span aria-hidden="true">·</span>
-            <span>대표 {expedition.representativeName || "대표 캐릭터 없음"}</span>
+            <span>
+              {expedition.representativeName.trim()
+                ? `대표 ${expedition.representativeName.trim()}`
+                : "대표 캐릭터 없음"}
+            </span>
             <span>· 캐릭터 {expedition.characters.length}명</span>
             {expedition.lastSyncedAt ? (
               <span>· 마지막 동기화 {formatDateTime(expedition.lastSyncedAt)}</span>
@@ -2129,12 +2135,20 @@ function ExpeditionBlock({
             <button
               className="add-raid-button"
               type="button"
-              onClick={() => setRestoreOpen((current) => !current)}
-              disabled={!restorableCharacters.length}
+              onClick={() => {
+                if (needsRepresentativeSetup) {
+                  onOpenSettings();
+                  return;
+                }
+                setRestoreOpen((current) => !current);
+              }}
+              disabled={
+                !needsRepresentativeSetup && !restorableCharacters.length
+              }
             >
               <CoolIcon name="add" /> 캐릭터 추가
             </button>
-            {restoreOpen ? (
+            {restoreOpen && restorableCharacters.length ? (
               <div className="restore-character-menu">
                 {restorableCharacters.map((character) => (
                   <button
