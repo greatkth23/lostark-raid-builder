@@ -35,6 +35,29 @@ const ArrowSwapIcon = () => (
   <span className="party-swap-icon" style={{ "--icon-url": "url(/icons/arrow-left-right.svg)" } as React.CSSProperties} aria-hidden="true" />
 );
 
+const PARTY_ICON_PATHS = {
+  users: "/icons/users.svg",
+  circle: "/icons/circle.svg",
+  circleCheck: "/icons/circle-check.svg",
+  reload: "/icons/reload.svg",
+  dealer: "/icons/dealer.svg",
+  shield: "/icons/shield.svg",
+  star: "/icons/star.svg",
+} as const;
+
+function PartyIcon({ name, className = "" }: {
+  name: keyof typeof PARTY_ICON_PATHS;
+  className?: string;
+}) {
+  return (
+    <span
+      className={`party-mask-icon ${className}`.trim()}
+      style={{ "--icon-url": `url(${PARTY_ICON_PATHS[name]})` } as React.CSSProperties}
+      aria-hidden="true"
+    />
+  );
+}
+
 export default function PartyPanel({
   plan,
   players,
@@ -97,7 +120,7 @@ export default function PartyPanel({
       <div className="party-panel-heading">
         <div>
           <h2>파티 목록</h2>
-          <p>이번 주 레이드 현황 · {formatRaidWeekDate(raidWeek)} 기준</p>
+          <p>이번 주 레이드 현황 · {formatRaidWeekRange(raidWeek)}</p>
         </div>
         <div className="party-heading-actions">
           <SegmentedControl
@@ -109,7 +132,7 @@ export default function PartyPanel({
             onChange={(value) => setNameMode(value as NameMode)}
           />
           <button className="party-update-button" type="button" onClick={onUpdate} disabled={updating}>
-            <span className="party-refresh-icon" aria-hidden="true">↻</span>
+            <PartyIcon name="reload" className="party-refresh-icon" />
             {updating ? "업데이트 중" : "업데이트"}
           </button>
         </div>
@@ -160,28 +183,29 @@ export default function PartyPanel({
       ) : (
         <div className="party-member-list">
           {sortedPlayers.map((player) => {
-            const assignments = groups.flatMap((group) =>
-              group.members.filter((member) => member.playerId === player.id).map((member) => ({ group, member })),
+            const playerGroups = groups.filter((group) =>
+              group.members.some((member) => member.playerId === player.id),
             );
-            if (!assignments.length) return null;
+            if (!playerGroups.length) return null;
             return (
-              <section className="party-member-section" key={player.id}>
-                <h3>{player.id === favoritePlayerId ? <span aria-hidden="true">☆</span> : null}{player.name}</h3>
-                <div className="party-member-assignments">
-                  {assignments.map(({ group, member }) => (
-                    <div className="party-member-assignment" key={`${group.id}:${member.id}`}>
-                      <div>
-                        <strong>{displayName(member)}</strong>
-                        <span>{member.className} · {formatItemLevel(member.itemLevel)}</span>
-                      </div>
-                      <span>{group.raidName}</span>
-                      <button type="button" aria-label={`${displayName(member)} 캐릭터 교환`} onClick={() => setSwapState({ group, member })}>
-                        <ArrowSwapIcon />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </section>
+              <MemberPartySection
+                key={player.id}
+                playerName={player.name}
+                favorite={player.id === favoritePlayerId}
+                groups={playerGroups}
+                allGroups={groups}
+                completedPartyIds={completedPartyIds}
+                displayName={displayName}
+                dragging={dragging}
+                onDragStart={setDragging}
+                onDragEnd={() => setDragging(null)}
+                onDrop={(targetGroupId) => {
+                  if (dragging) onMove(dragging.memberId, dragging.groupId, targetGroupId);
+                  setDragging(null);
+                }}
+                onOpenSwap={(group, member) => setSwapState({ group, member })}
+                onToggleComplete={onToggleComplete}
+              />
             );
           })}
         </div>
@@ -235,19 +259,59 @@ function RaidFamilySection({ family, groups, completedPartyIds, displayName, dra
 }) {
   const familyRaids = RAID_DEFINITIONS.filter((raid) => raid.family === family);
   const maximumGold = Math.max(0, ...familyRaids.map((raid) => raid.gold));
-  const completeCount = groups.filter((group) => completedPartyIds.has(group.id)).length;
+  const orderedGroups = orderCompletedGroups(groups, completedPartyIds);
   return (
     <section className="party-family-section">
       <header>
         <div><h3>{family}</h3><span>{maximumGold.toLocaleString("ko-KR")}G~</span></div>
-        <span>{completeCount}/{groups.length} 완료</span>
       </header>
       <div className="party-card-row">
-        {groups.map((group, index) => (
+        {orderedGroups.map((group) => (
           <PartyCard
             key={group.id}
             group={group}
-            groupIndex={index + 1}
+            groupIndex={groups.filter((candidate) => candidate.raidName === group.raidName).findIndex((candidate) => candidate.id === group.id) + 1}
+            completed={completedPartyIds.has(group.id)}
+            displayName={displayName}
+            dragging={dragging}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            onDrop={() => onDrop(group.id)}
+            onOpenSwap={onOpenSwap}
+            onToggleComplete={onToggleComplete}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MemberPartySection({ playerName, favorite, groups, allGroups, completedPartyIds, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onToggleComplete }: {
+  playerName: string;
+  favorite: boolean;
+  groups: RaidGroup[];
+  allGroups: RaidGroup[];
+  completedPartyIds: Set<string>;
+  displayName: (member: AssignedMember) => string;
+  dragging: { memberId: string; groupId: string } | null;
+  onDragStart: (value: { memberId: string; groupId: string }) => void;
+  onDragEnd: () => void;
+  onDrop: (groupId: string) => void;
+  onOpenSwap: (group: RaidGroup, member: AssignedMember) => void;
+  onToggleComplete: (group: RaidGroup, completed: boolean) => void;
+}) {
+  const orderedGroups = orderCompletedGroups(groups, completedPartyIds);
+  return (
+    <section className="party-member-section">
+      <header>
+        <h3>{favorite ? <PartyIcon name="star" /> : null}{playerName}</h3>
+      </header>
+      <div className="party-card-row">
+        {orderedGroups.map((group) => (
+          <PartyCard
+            key={group.id}
+            group={group}
+            groupIndex={allGroups.filter((candidate) => candidate.raidName === group.raidName).findIndex((candidate) => candidate.id === group.id) + 1}
             completed={completedPartyIds.has(group.id)}
             displayName={displayName}
             dragging={dragging}
@@ -283,12 +347,13 @@ function PartyCard({ group, groupIndex, completed, displayName, dragging, onDrag
       onDrop={(event) => { event.preventDefault(); onDrop(); }}
     >
       <div className="party-card-title">
-        <h4>{group.raidName} {groupIndex}</h4>
+        <h4>{group.raidName} {groupIndex}공대</h4>
         <button className={completed ? "complete" : ""} type="button" onClick={() => onToggleComplete(group, !completed)}>
-          <span aria-hidden="true">{completed ? "✓" : "○"}</span>{completed ? "완료" : "미완료"}
+          <PartyIcon name={completed ? "circleCheck" : "circle"} />
+          {completed ? "완료" : "미완료"}
         </button>
       </div>
-      <div className="party-capacity"><span aria-hidden="true">♧</span> {group.members.length} / {group.size}명</div>
+      <div className="party-capacity"><PartyIcon name="users" /> {group.members.length} / {group.size}명</div>
       <div className="party-roster">
         {group.members.map((member) => (
           <div
@@ -305,8 +370,11 @@ function PartyCard({ group, groupIndex, completed, displayName, dragging, onDrag
             <span className="party-role-badge">{roleLabel(member.role)}</span>
             <strong>{displayName(member)}</strong>
             <span className="party-class-name">{member.className}</span>
-            <span className="party-level">♢ {formatItemLevel(member.itemLevel)}</span>
-            <span className={`party-power ${member.role}`}>⌁ {member.combatPower.toLocaleString("ko-KR")}</span>
+            <span className="party-level">{formatItemLevel(member.itemLevel)}</span>
+            <span className={`party-power ${member.role}`}>
+              <PartyIcon name={member.role === "dealer" ? "dealer" : "shield"} />
+              {member.combatPower.toLocaleString("ko-KR")}
+            </span>
             <button type="button" aria-label={`${displayName(member)} 캐릭터 교환`} onClick={() => onOpenSwap(group, member)} disabled={completed}>
               <ArrowSwapIcon />
             </button>
@@ -401,7 +469,27 @@ function SwapModal({ state, groups, players, raidWeek, onClose, onSelect }: {
 
 const formatItemLevel = (value: number) => value.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-const formatRaidWeekDate = (value: string) => {
+const orderCompletedGroups = (groups: RaidGroup[], completedPartyIds: Set<string>) =>
+  groups
+    .map((group, index) => ({ group, index }))
+    .sort((a, b) =>
+      Number(completedPartyIds.has(a.group.id)) - Number(completedPartyIds.has(b.group.id)) ||
+      a.index - b.index,
+    )
+    .map(({ group }) => group);
+
+const formatRaidWeekRange = (value: string) => {
   const [year, month, day] = value.split("-").map(Number);
-  return year && month && day ? `${year}년 ${month}월 ${day}일` : "이번 주";
+  if (!year || !month || !day) return "이번 주";
+  const end = new Date(Date.UTC(year, month - 1, day + 6));
+  const endYear = end.getUTCFullYear();
+  const endMonth = end.getUTCMonth() + 1;
+  const endDay = end.getUTCDate();
+  if (year !== endYear) {
+    return `${year}년 ${month}월 ${day}일 ~ ${endYear}년 ${endMonth}월 ${endDay}일`;
+  }
+  if (month !== endMonth) {
+    return `${year}년 ${month}월 ${day}일 ~ ${endMonth}월 ${endDay}일`;
+  }
+  return `${year}년 ${month}월 ${day}일 ~ ${endDay}일`;
 };

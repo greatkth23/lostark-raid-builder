@@ -69,7 +69,7 @@ const FAVORITE_PLAYERS_STORAGE_KEY = "loiar-favorite-players-v1";
 
 const TABS: Array<{ id: TabKey; label: string }> = [
   { id: "players", label: "멤버 목록" },
-  { id: "results", label: "파티 구성" },
+  { id: "results", label: "파티 목록" },
 ];
 
 const RAID_FAMILIES = Array.from(
@@ -154,6 +154,7 @@ export default function Home() {
   const pendingMutationsRef = useRef(0);
   const snapshotRequestIdRef = useRef(0);
   const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const completedPartyIdsRef = useRef<Set<string>>(new Set());
 
   const applySnapshot = useCallback(
     (snapshot: {
@@ -172,7 +173,7 @@ export default function Home() {
       setRaidWeek(snapshot.raidWeek);
       setManualPartyLayout(nextLayout);
       setGeneratedPlan((current) =>
-        current
+        current && completedPartyIdsRef.current.size === 0
           ? buildRaidPlan(
               buildCharacterInputs(normalized, snapshot.raidWeek),
               nextLayout,
@@ -575,7 +576,8 @@ export default function Home() {
     commitPartyPlan(plan);
     setGeneratedPlan(plan);
     setActiveTab("results");
-    setCompletedPartyIds(new Set());
+    completedPartyIdsRef.current = new Set();
+    setCompletedPartyIds(completedPartyIdsRef.current);
     setNotice("");
   };
 
@@ -825,7 +827,8 @@ export default function Home() {
     setManualPartyLayout(partyLayout);
     setGeneratedPlan(nextPlan);
     setGeneratedFingerprint(JSON.stringify(nextPlayers));
-    setCompletedPartyIds(new Set());
+    completedPartyIdsRef.current = new Set();
+    setCompletedPartyIds(completedPartyIdsRef.current);
     queueMutation(operation);
     setSyncingId("");
     setUpdatingParty(false);
@@ -874,6 +877,7 @@ export default function Home() {
       const next = new Set(current);
       if (completed) next.add(group.id);
       else next.delete(group.id);
+      completedPartyIdsRef.current = next;
       return next;
     });
     queueMutation(operation);
@@ -894,6 +898,8 @@ export default function Home() {
     setPlayers([createPlayer(1)]);
     setGeneratedPlan(null);
     setGeneratedFingerprint("");
+    completedPartyIdsRef.current = new Set();
+    setCompletedPartyIds(completedPartyIdsRef.current);
     setNotice("");
   };
 
@@ -921,7 +927,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f7f8fb] text-[#151923]">
+    <main className="min-h-screen bg-white text-[#151923]">
       <div className="workspace-shell mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-5">
         <header className="app-header">
           <div className="room-identity">
@@ -2943,7 +2949,7 @@ function ResultPanel({
     <section className="result-shell">
       <div className="result-heading">
         <div>
-          <h2>파티 구성</h2>
+          <h2>파티 목록</h2>
           <p>공석은 숨기고 내부 멤버만 표시합니다.</p>
         </div>
         <button className="dark-button" type="button" onClick={onGenerate}>

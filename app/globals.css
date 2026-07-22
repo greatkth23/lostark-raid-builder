@@ -1,7 +1,8 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 @import "tailwindcss";
 
 :root {
-  --background: #f7f8fb;
+  --background: #ffffff;
   --foreground: #111827;
   --line: #e5ebf3;
   --line-strong: #c9d2df;
@@ -83,7 +84,7 @@
 }
 
 .party-update-button:disabled { opacity: .55; }
-.party-refresh-icon { font-size: 19px; line-height: 1; }
+.party-refresh-icon { width: 15px; height: 15px; }
 
 .party-warning {
   border: 1px solid #fed7aa;
@@ -121,6 +122,21 @@
   padding: 0 16px;
 }
 
+.party-member-section > header {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  border-bottom: 1px solid #dbe3ed;
+  background: #f8fafc;
+  padding: 0 16px;
+}
+
+.party-member-section > header h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
 .party-family-section > header > div {
   display: flex;
   align-items: baseline;
@@ -148,27 +164,36 @@
 }
 
 .party-card-row {
-  display: flex;
-  overflow-x: auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: flex-start;
   gap: 16px;
   padding: 16px;
-  scrollbar-width: thin;
 }
 
 .party-card {
-  flex: 0 0 416px;
+  width: 100%;
+  min-width: 0;
   min-height: 200px;
   border: 1px solid #d9e2ed;
   border-radius: 9px;
   background: #fff;
   padding: 22px 24px 16px;
   box-shadow: 0 1px 2px rgb(15 23 42 / 7%);
-  transition: border-color .15s, background .15s, opacity .15s;
+  transition: border-color .15s, background .15s, opacity .15s, transform .3s ease;
 }
 
 .party-card.drop-ready { border-style: dashed; border-color: #94a3b8; }
-.party-card.completed { background: #f8fafc; opacity: .68; }
+.party-card.completed {
+  background: #f8fafc;
+  opacity: .68;
+  animation: party-card-send-back .4s cubic-bezier(.2, .8, .2, 1);
+}
+
+@keyframes party-card-send-back {
+  from { transform: translateX(-14px) scale(.985); opacity: .45; }
+  to { transform: translateX(0) scale(1); opacity: .68; }
+}
 
 .party-card-title {
   display: flex;
@@ -193,6 +218,9 @@
 .party-card-title button.complete { border-color: #16a34a; background: #16a34a; color: #fff; }
 
 .party-capacity {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin: 10px 0 8px;
   color: #64748b;
   font-size: 11px;
@@ -203,18 +231,20 @@
 .party-empty-slot {
   display: grid;
   min-height: 27px;
-  grid-template-columns: 36px minmax(70px, 1fr) minmax(52px, auto) 92px 72px 22px;
+  grid-template-columns: 36px minmax(96px, 1fr) minmax(48px, auto) minmax(54px, 64px) minmax(58px, 68px) 20px;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   border-bottom: 1px dashed #e2e8f0;
+  padding-left: 8px;
   font-size: 11px;
 }
 
 .party-character-row[draggable="true"] { cursor: grab; }
 .party-character-row[draggable="true"]:active { cursor: grabbing; }
 .party-character-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.party-class-name, .party-level { color: #64748b; white-space: nowrap; }
-.party-power { color: #f97316; white-space: nowrap; }
+.party-class-name, .party-level { overflow: hidden; color: #64748b; text-overflow: ellipsis; white-space: nowrap; }
+.party-level { text-align: right; }
+.party-power { display: inline-flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 2px; color: #f97316; white-space: nowrap; }
 .party-power.support { color: #16a34a; }
 .party-character-row > button {
   display: inline-grid;
@@ -228,16 +258,22 @@
 
 .party-character-row > button:disabled { opacity: .35; }
 .party-swap-icon,
-.party-refresh-icon {
+.party-mask-icon {
   display: inline-block;
   width: 14px;
   height: 14px;
 }
-.party-swap-icon {
+.party-swap-icon,
+.party-mask-icon {
+  flex: none;
   background: currentColor;
   -webkit-mask: var(--icon-url) center / contain no-repeat;
   mask: var(--icon-url) center / contain no-repeat;
 }
+
+.party-card-title button .party-mask-icon { width: 13px; height: 13px; }
+.party-capacity .party-mask-icon { width: 12px; height: 12px; }
+.party-power .party-mask-icon { width: 11px; height: 11px; }
 
 .party-role-badge {
   display: inline-flex;
@@ -269,14 +305,6 @@
 .party-card-gold span:last-child { color: #64748b; }
 .party-gold-icon { width: 13px; height: 13px; flex: none; background-position: center; background-size: contain; background-repeat: no-repeat; }
 
-.party-member-section h3 { display: flex; gap: 7px; border-bottom: 1px solid #e2e8f0; background: #f8fafc; padding: 14px 16px; }
-.party-member-assignments { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; padding: 14px; }
-.party-member-assignment { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(130px, 1fr) 28px; align-items: center; gap: 12px; border: 1px solid #e2e8f0; border-radius: 7px; padding: 10px 12px; }
-.party-member-assignment > div { display: flex; min-width: 0; flex-direction: column; }
-.party-member-assignment strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.party-member-assignment span { color: #64748b; font-size: 11px; }
-.party-member-assignment button { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid #dbe3ed; border-radius: 6px; background: #fff; }
-
 .party-empty { display: flex; min-height: 240px; flex-direction: column; align-items: center; justify-content: center; gap: 6px; border: 1px dashed #cbd5e1; border-radius: 10px; color: #64748b; }
 .party-empty strong { color: #1e293b; }
 
@@ -303,11 +331,11 @@
 @media (max-width: 720px) {
   .party-panel-heading { flex-direction: column; }
   .party-heading-actions { width: 100%; justify-content: space-between; }
-  .party-card { flex-basis: min(390px, calc(100vw - 72px)); padding: 18px 14px 14px; }
+  .party-card-row { display: flex; overflow-x: auto; scrollbar-width: thin; }
+  .party-card { flex: 0 0 min(390px, calc(100vw - 72px)); padding: 18px 14px 14px; }
   .party-character-row { grid-template-columns: 34px minmax(74px, 1fr) 68px 22px; }
   .party-character-row .party-level { display: none; }
   .party-character-row .party-power { display: none; }
-  .party-member-assignments { grid-template-columns: 1fr; }
   .party-current-character,
   .party-swap-candidates button { grid-template-columns: 38px minmax(70px, 1fr) auto; }
   .party-current-character > span:nth-of-type(3),
@@ -318,7 +346,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Inter, "Inter Fallback", Arial, Helvetica, sans-serif;
+  --font-sans: "Pretendard", sans-serif;
   --font-mono: var(--font-geist-mono);
 }
 
@@ -326,15 +354,23 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Inter, "Inter Fallback", Arial, Helvetica, sans-serif;
+  font-family: "Pretendard", sans-serif;
 }
 
 button,
-input {
+input,
+select,
+textarea,
+code,
+kbd,
+samp,
+pre {
   font: inherit;
+  font-family: "Pretendard", sans-serif;
 }
 
 button:disabled {
@@ -509,7 +545,7 @@ button:disabled {
   margin-left: -24px;
   overflow: visible;
   border-bottom: 1px solid var(--line);
-  background: rgb(247 248 251 / 96%);
+  background: rgb(255 255 255 / 96%);
   padding: 0 24px;
   backdrop-filter: blur(8px);
 }
@@ -594,7 +630,7 @@ button:disabled {
   place-items: center;
   padding: 24px;
   color: #5b6d86;
-  background: #f7f8fb;
+  background: #ffffff;
   font-weight: 700;
 }
 
@@ -603,9 +639,7 @@ button:disabled {
   display: grid;
   place-items: center;
   padding: 80px 24px 24px;
-  background:
-    radial-gradient(circle at top left, rgba(55, 92, 160, 0.14), transparent 32rem),
-    #f4f6fa;
+  background: #ffffff;
 }
 
 .room-gate-card {
