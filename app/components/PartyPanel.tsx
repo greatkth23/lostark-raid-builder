@@ -208,9 +208,11 @@ export default function PartyPanel({
       ) : (
         <div className="party-member-list">
           {sortedPlayers.map((player) => {
-            const playerGroups = displayGroups.filter((group) =>
-              group.members.some((member) => member.playerId === player.id),
-            );
+            const playerGroups = displayGroups
+              .filter((group) =>
+                group.members.some((member) => member.playerId === player.id),
+              )
+              .sort((a, b) => b.members.length - a.members.length);
             if (!playerGroups.length) return null;
             return (
               <MemberPartySection
