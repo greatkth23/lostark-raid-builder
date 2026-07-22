@@ -30,6 +30,7 @@ export type CharacterInput = {
   className: string;
   role: Role;
   selectedRaids: string[];
+  completedRaids: string[];
 };
 
 export type AssignedMember = {
@@ -78,6 +79,7 @@ type PlayerBucket = {
 
 type WorkingGroup = {
   id?: string;
+  locked?: boolean;
   members: AssignedMember[];
   playerIds: Set<string>;
   classCounts: Record<string, number>;
@@ -124,6 +126,7 @@ export const buildRaidPlan = (
 ): RaidPlanResult => {
   const warnings: string[] = [];
   const requestsByRaid = new Map<string, RaidRequest[]>();
+  const charactersById = new Map(characters.map((character) => [character.id, character]));
 
   for (const character of characters) {
     if (!character.playerName.trim() || !character.characterName.trim()) {
@@ -197,8 +200,14 @@ export const buildRaidPlan = (
       };
 
       manualGroup.memberIds.forEach((memberId) => {
-        const request = requests.find(
+        const activeRequest = requests.find(
           (candidate) => candidate.id === memberId && !usedMemberIds.has(memberId),
+        );
+        const character = charactersById.get(memberId);
+        const request = activeRequest ?? (
+          character?.completedRaids.includes(raidName)
+            ? characterToRaidRequest(character, raidName)
+            : undefined
         );
         if (!request || !canAddRequest(raid, group, request)) return;
         group.members.push(request);
@@ -208,6 +217,10 @@ export const buildRaidPlan = (
         else group.supportCount += 1;
         usedMemberIds.add(memberId);
       });
+
+      group.locked = group.members.length > 0 && group.members.every((member) =>
+        charactersById.get(member.id)?.completedRaids.includes(raidName),
+      );
 
       return group;
     });
@@ -295,6 +308,7 @@ const trySolveWithGroupCount = (
   const groups: WorkingGroup[] = [
     ...seededGroups.map((group) => ({
       id: group.id,
+      locked: group.locked,
       members: [...group.members],
       playerIds: new Set(group.playerIds),
       classCounts: { ...group.classCounts },
@@ -317,6 +331,7 @@ const trySolveWithGroupCount = (
     if (bucketIndex >= buckets.length) {
       return groups.map((group) => ({
         id: group.id,
+        locked: group.locked,
         members: [...group.members],
         playerIds: new Set(group.playerIds),
         classCounts: { ...group.classCounts },
@@ -517,6 +532,10 @@ const canAddRequest = (
   group: WorkingGroup,
   request: RaidRequest,
 ) => {
+  if (group.locked) {
+    return false;
+  }
+
   if (group.playerIds.has(request.playerId)) {
     return false;
   }
@@ -553,6 +572,22 @@ const incrementClass = (
 
   group.classCounts[key] = nextValue;
 };
+
+const characterToRaidRequest = (
+  character: CharacterInput,
+  raidName: string,
+): RaidRequest => ({
+  type: "character",
+  id: character.id,
+  playerId: character.playerId,
+  playerName: character.playerName,
+  characterName: character.characterName,
+  itemLevel: character.itemLevel,
+  combatPower: character.combatPower,
+  className: character.className,
+  role: character.role,
+  raidName,
+});
 
 const finalizeGroup = (
   raid: RaidDefinition,

@@ -40,9 +40,10 @@
   font-size: 13px;
 }
 
-.party-heading-actions {
+.party-filter-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
@@ -56,31 +57,35 @@
 }
 
 .party-segmented button {
-  min-height: 32px;
+  display: inline-flex;
+  min-height: 27px;
+  align-items: center;
+  gap: 5px;
   border: 0;
   border-right: 1px solid #e5eaf1;
   background: transparent;
-  padding: 0 12px;
+  padding: 0 9px;
   color: #475569;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .party-segmented button:last-child { border-right: 0; }
 .party-segmented button.active { background: #101827; color: #fff; }
-.party-view-control { margin-top: 10px; }
+.party-segmented button .party-mask-icon { width: 13px; height: 13px; }
 
 .party-update-button {
   display: inline-flex;
-  min-height: 34px;
+  min-height: 29px;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   border: 1px solid #dbe3ed;
   border-radius: 7px;
   background: #fff;
-  padding: 0 13px;
+  padding: 0 10px;
   color: #111827;
-  font-weight: 650;
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .party-update-button:disabled { opacity: .55; }
@@ -180,19 +185,13 @@
   background: #fff;
   padding: 22px 24px 16px;
   box-shadow: 0 1px 2px rgb(15 23 42 / 7%);
-  transition: border-color .15s, background .15s, opacity .15s, transform .3s ease;
+  transition: border-color .15s, background .15s, opacity .15s;
 }
 
 .party-card.drop-ready { border-style: dashed; border-color: #94a3b8; }
 .party-card.completed {
   background: #f8fafc;
   opacity: .68;
-  animation: party-card-send-back .4s cubic-bezier(.2, .8, .2, 1);
-}
-
-@keyframes party-card-send-back {
-  from { transform: translateX(-14px) scale(.985); opacity: .45; }
-  to { transform: translateX(0) scale(1); opacity: .68; }
 }
 
 .party-card-title {
@@ -231,25 +230,28 @@
 .party-empty-slot {
   display: grid;
   min-height: 27px;
-  grid-template-columns: 36px minmax(96px, 1fr) minmax(48px, auto) minmax(54px, 64px) minmax(58px, 68px) 20px;
+  grid-template-columns: 32px minmax(0, 1fr) 66px 54px 60px 18px;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   border-bottom: 1px dashed #e2e8f0;
-  padding-left: 8px;
+  padding-left: 4px;
   font-size: 11px;
 }
 
 .party-character-row[draggable="true"] { cursor: grab; }
 .party-character-row[draggable="true"]:active { cursor: grabbing; }
-.party-character-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
-.party-class-name, .party-level { overflow: hidden; color: #64748b; text-overflow: ellipsis; white-space: nowrap; }
+.party-character-row > * { min-width: 0; }
+.party-character-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 400; }
+.party-class-name, .party-level { width: 100%; overflow: hidden; color: #64748b; text-overflow: ellipsis; white-space: nowrap; }
+.party-class-name { text-align: left; }
 .party-level { text-align: right; }
 .party-power { display: inline-flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 2px; color: #f97316; white-space: nowrap; }
 .party-power.support { color: #16a34a; }
 .party-character-row > button {
   display: inline-grid;
-  width: 22px;
+  width: 18px;
   height: 22px;
+  justify-self: end;
   place-items: center;
   border: 0;
   background: transparent;
@@ -292,7 +294,8 @@
 .party-character-row.support .party-role-badge,
 .party-empty-slot.support .party-role-badge,
 .party-role-badge.support { border-color: #4ade80; background: #f0fdf4; color: #16a34a; }
-.party-empty-slot { grid-template-columns: 36px 1fr; border: 1px dashed #dbe3ed; color: #64748b; }
+.party-empty-slot { width: 100%; grid-template-columns: 32px 1fr; border: 1px dashed #dbe3ed; background: #fff; color: #64748b; text-align: left; }
+.party-empty-slot:disabled { background: transparent; }
 
 .party-card-gold {
   display: flex;
@@ -301,7 +304,7 @@
   margin-top: 12px;
   font-size: 11px;
 }
-.party-card-gold strong { color: #e88b00; }
+.party-gold-total { color: #e88b00; font-weight: 400; }
 .party-card-gold span:last-child { color: #64748b; }
 .party-gold-icon { width: 13px; height: 13px; flex: none; background-position: center; background-size: contain; background-repeat: no-repeat; }
 
@@ -324,16 +327,23 @@
 .party-swap-candidates button { position: relative; background: #fff; cursor: pointer; }
 .party-swap-candidates button:hover { border-color: #64748b; background: #f8fafc; }
 .party-swap-candidates small { grid-column: 2 / -1; color: #64748b; }
+.party-candidate-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .party-no-candidate { border: 1px dashed #cbd5e1; border-radius: 7px; padding: 18px; color: #64748b; text-align: center; font-size: 12px; }
 .party-modal-footer { display: flex; justify-content: flex-end; margin-top: 22px; }
 .party-modal-footer button { min-height: 36px; border: 1px solid #dbe3ed; border-radius: 7px; background: #fff; padding: 0 15px; }
 
 @media (max-width: 720px) {
-  .party-panel-heading { flex-direction: column; }
-  .party-heading-actions { width: 100%; justify-content: space-between; }
+  .party-panel-heading { align-items: flex-start; gap: 10px; }
+  .party-title-block { min-width: 0; }
+  .party-panel-heading h2 { font-size: 22px; }
+  .party-panel-heading p { white-space: nowrap; font-size: 12px; }
+  .party-update-button { flex: none; }
+  .party-filter-row { width: 100%; }
+  .party-name-control .party-segmented-label { display: none; }
+  .party-name-control button { width: 35px; justify-content: center; padding: 0; }
   .party-card-row { display: flex; overflow-x: auto; scrollbar-width: thin; }
   .party-card { flex: 0 0 min(390px, calc(100vw - 72px)); padding: 18px 14px 14px; }
-  .party-character-row { grid-template-columns: 34px minmax(74px, 1fr) 68px 22px; }
+  .party-character-row { grid-template-columns: 32px minmax(0, 1fr) 68px 18px; }
   .party-character-row .party-level { display: none; }
   .party-character-row .party-power { display: none; }
   .party-current-character,
@@ -341,6 +351,16 @@
   .party-current-character > span:nth-of-type(3),
   .party-swap-candidates button > span:nth-of-type(3) { display: none; }
   .player-card + .player-card { margin-top: 16px; }
+}
+
+@media (min-width: 721px) and (max-width: 1200px) {
+  .party-card-row { gap: 10px; padding: 12px; }
+  .party-card { padding: 18px 12px 14px; }
+}
+
+@media (min-width: 721px) and (max-width: 900px) {
+  .party-card-row { display: flex; overflow-x: auto; scrollbar-width: thin; }
+  .party-card { flex: 0 0 min(390px, calc(100vw - 72px)); }
 }
 
 @theme inline {

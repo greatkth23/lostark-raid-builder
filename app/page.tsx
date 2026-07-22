@@ -322,6 +322,28 @@ export default function Home() {
     () => buildCharacterInputs(players, raidWeek),
     [players, raidWeek],
   );
+  const effectiveCompletedPartyIds = useMemo(() => {
+    const result = new Set(completedPartyIds);
+    if (!generatedPlan || !raidWeek) return result;
+    const completionsByCharacter = new Map(
+      players.flatMap((player) =>
+        player.expeditions.flatMap((expedition) =>
+          expedition.characters.map((character) => [character.id, character.raidCompletions] as const),
+        ),
+      ),
+    );
+    allPlanGroups(generatedPlan).forEach((group) => {
+      if (
+        group.members.length > 0 &&
+        group.members.every((member) =>
+          completionsByCharacter.get(member.id)?.[group.raidName] === raidWeek,
+        )
+      ) {
+        result.add(group.id);
+      }
+    });
+    return result;
+  }, [completedPartyIds, generatedPlan, players, raidWeek]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1025,7 +1047,7 @@ export default function Home() {
             players={players}
             raidWeek={raidWeek}
             favoritePlayerId={favoritePlayerId}
-            completedPartyIds={completedPartyIds}
+            completedPartyIds={effectiveCompletedPartyIds}
             stale={isPlanStale}
             updating={updatingParty}
             onUpdate={updateAndCompose}
@@ -3084,6 +3106,9 @@ const buildCharacterInputs = (players: Player[], raidWeek: string): CharacterInp
         role: character.role,
         selectedRaids: character.selectedRaids.filter(
           (raidName) => character.raidCompletions[raidName] !== raidWeek,
+        ),
+        completedRaids: character.selectedRaids.filter(
+          (raidName) => character.raidCompletions[raidName] === raidWeek,
         ),
       })),
     ),

@@ -160,14 +160,25 @@ export const reconcileManualLayout = (
     groups: layout.groups.flatMap((group) => {
       const raid = getRaidDefinition(group.raidName);
       if (!raid) return [];
-      const memberIds = group.memberIds.filter((id) => {
+      const eligibleIds = group.memberIds.filter((id) => {
         const character = byId.get(id);
         if (
           !character ||
           claimed.has(id) ||
           character.itemLevel < raid.minItemLevel ||
-          !character.selectedRaids.includes(group.raidName)
+          (
+            !character.selectedRaids.includes(group.raidName) &&
+            !character.completedRaids.includes(group.raidName)
+          )
         ) return false;
+        return true;
+      });
+      const completedGroup = eligibleIds.length > 0 && eligibleIds.every((id) =>
+        byId.get(id)?.completedRaids.includes(group.raidName),
+      );
+      const memberIds = eligibleIds.filter((id) => {
+        const character = byId.get(id);
+        if (!completedGroup && !character?.selectedRaids.includes(group.raidName)) return false;
         claimed.add(id);
         return true;
       });
