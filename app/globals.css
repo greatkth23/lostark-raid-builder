@@ -3113,10 +3113,7 @@ button:disabled {
 .integrated-character-grid {
   display: grid;
   min-width: 0;
-  grid-template-columns: repeat(
-    auto-fit,
-    minmax(min(100%, 270px), 1fr)
-  );
+  grid-template-columns: repeat(3, minmax(270px, 1fr));
   align-items: stretch;
   justify-content: start;
   gap: 16px;
@@ -3242,6 +3239,12 @@ button:disabled {
 @media (max-width: 1100px) {
   .integrated-character-card {
     padding: 15px 16px 12px;
+  }
+}
+
+@media (max-width: 900px) {
+  .integrated-character-grid {
+    grid-template-columns: repeat(2, minmax(270px, 1fr));
   }
 }
 
