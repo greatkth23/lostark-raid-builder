@@ -5,6 +5,7 @@ import {
   type GoldPreference,
   type Role,
 } from "./raidPlanner";
+import type { ManualPartyLayout } from "./partyTypes";
 
 export type Character = {
   id: string;
@@ -72,6 +73,11 @@ export type RaidGroupOperation =
       expedition: Expedition;
     }
   | {
+      type: "expedition.replaceMany";
+      replacements: Array<{ playerId: string; expedition: Expedition }>;
+      partyLayout?: ManualPartyLayout;
+    }
+  | {
       type: "character.remove";
       playerId: string;
       expeditionId: string;
@@ -113,6 +119,27 @@ export type RaidGroupOperation =
       characterId: string;
       raidName: string;
       completed: boolean;
+    }
+  | {
+      type: "completion.batch";
+      targets: Array<{
+        playerId: string;
+        expeditionId: string;
+        characterId: string;
+        raidName: string;
+      }>;
+      completed: boolean;
+    }
+  | {
+      type: "party.layout.set";
+      partyLayout: ManualPartyLayout;
+      raidChanges?: Array<{
+        playerId: string;
+        expeditionId: string;
+        characterId: string;
+        raidName: string;
+        checked: boolean;
+      }>;
     }
   | { type: "completion.reset" };
 
@@ -366,6 +393,19 @@ export const applyRaidGroupOperation = (
           : player,
       );
       break;
+    case "expedition.replaceMany":
+      operation.replacements.forEach((replacement) => {
+        players = applyRaidGroupOperation(
+          players,
+          {
+            type: "expedition.replace",
+            playerId: replacement.playerId,
+            expedition: replacement.expedition,
+          },
+          raidWeek,
+        );
+      });
+      break;
     case "character.remove":
       players = mapExpedition(players, operation.playerId, operation.expeditionId, (expedition) => {
         const removed = expedition.characters.find(
@@ -476,6 +516,24 @@ export const applyRaidGroupOperation = (
         if (operation.completed) raidCompletions[operation.raidName] = raidWeek;
         else delete raidCompletions[operation.raidName];
         return { ...character, raidCompletions };
+      });
+      break;
+    case "completion.batch":
+      operation.targets.forEach((target) => {
+        players = applyRaidGroupOperation(
+          players,
+          { type: "completion.set", ...target, completed: operation.completed },
+          raidWeek,
+        );
+      });
+      break;
+    case "party.layout.set":
+      operation.raidChanges?.forEach((change) => {
+        players = applyRaidGroupOperation(
+          players,
+          { type: "character.raid", ...change },
+          raidWeek,
+        );
       });
       break;
     case "completion.reset":

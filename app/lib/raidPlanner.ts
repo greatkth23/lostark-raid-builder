@@ -7,6 +7,7 @@ import {
   type GoldPreference,
   type RaidDefinition,
 } from "./raidCatalog";
+import type { ManualPartyLayout } from "./partyTypes";
 
 export {
   RAID_DEFINITIONS,
@@ -25,6 +26,7 @@ export type CharacterInput = {
   playerName: string;
   characterName: string;
   itemLevel: number;
+  combatPower: number;
   className: string;
   role: Role;
   selectedRaids: string[];
@@ -37,6 +39,7 @@ export type AssignedMember = {
   playerName: string;
   characterName: string;
   itemLevel: number;
+  combatPower: number;
   className: string;
   role: Role;
 };
@@ -74,6 +77,7 @@ type PlayerBucket = {
 };
 
 type WorkingGroup = {
+  id?: string;
   members: AssignedMember[];
   playerIds: Set<string>;
   classCounts: Record<string, number>;
@@ -114,7 +118,10 @@ export const inferRoleFromClassName = (className: string): Role | null => {
 
 export const roleLabel = (role: Role) => (role === "dealer" ? "딜러" : "서폿");
 
-export const buildRaidPlan = (characters: CharacterInput[]): RaidPlanResult => {
+export const buildRaidPlan = (
+  characters: CharacterInput[],
+  manualLayout?: ManualPartyLayout,
+): RaidPlanResult => {
   const warnings: string[] = [];
   const requestsByRaid = new Map<string, RaidRequest[]>();
 
@@ -153,6 +160,7 @@ export const buildRaidPlan = (characters: CharacterInput[]): RaidPlanResult => {
         playerName: character.playerName,
         characterName: character.characterName,
         itemLevel: character.itemLevel,
+        combatPower: character.combatPower,
         className,
         role: character.role,
         raidName,
@@ -169,12 +177,44 @@ export const buildRaidPlan = (characters: CharacterInput[]): RaidPlanResult => {
   for (const raidName of RAID_DEFINITIONS.map((raid) => raid.name)) {
     const raid = getRaidDefinition(raidName);
     const requests = requestsByRaid.get(raidName) ?? [];
+    const manualGroups = manualLayout?.groups.filter(
+      (group) => group.raidName === raidName,
+    ) ?? [];
 
-    if (!raid || requests.length === 0) {
+    if (!raid || (requests.length === 0 && manualGroups.length === 0)) {
       continue;
     }
 
-    const solvedGroups = solveRaidGroups(raid, requests);
+    const usedMemberIds = new Set<string>();
+    const seededGroups = manualGroups.map((manualGroup) => {
+      const group: WorkingGroup = {
+        id: manualGroup.id,
+        members: [],
+        playerIds: new Set<string>(),
+        classCounts: {},
+        dealerCount: 0,
+        supportCount: 0,
+      };
+
+      manualGroup.memberIds.forEach((memberId) => {
+        const request = requests.find(
+          (candidate) => candidate.id === memberId && !usedMemberIds.has(memberId),
+        );
+        if (!request || !canAddRequest(raid, group, request)) return;
+        group.members.push(request);
+        group.playerIds.add(request.playerId);
+        incrementClass(group, request.className, 1);
+        if (request.role === "dealer") group.dealerCount += 1;
+        else group.supportCount += 1;
+        usedMemberIds.add(memberId);
+      });
+
+      return group;
+    });
+    const remainingRequests = requests.filter(
+      (request) => !usedMemberIds.has(request.id),
+    );
+    const solvedGroups = solveRaidGroups(raid, remainingRequests, seededGroups);
     groupsByRaid[raidName] = solvedGroups.map((group, index) =>
       finalizeGroup(raid, raidName, group, index),
     );
@@ -186,7 +226,11 @@ export const buildRaidPlan = (characters: CharacterInput[]): RaidPlanResult => {
 const solveRaidGroups = (
   raid: RaidDefinition,
   requests: RaidRequest[],
+  seededGroups: WorkingGroup[] = [],
 ): WorkingGroup[] => {
+  if (requests.length === 0) {
+    return seededGroups;
+  }
   const dealerCount = requests.filter((request) => request.role === "dealer").length;
   const supportCount = requests.length - dealerCount;
   const requestCountByPlayer = requests.reduce<Record<string, number>>(
@@ -206,45 +250,73 @@ const solveRaidGroups = (
   const maxClassRequests = Math.max(...Object.values(requestCountByClass));
   const lowerBound = Math.max(
     1,
+    seededGroups.length,
     Math.ceil(dealerCount / raid.dealerSlots),
     Math.ceil(supportCount / raid.supportSlots),
     maxPlayerRequests,
     Math.ceil(maxClassRequests / classLimit),
   );
 
-  for (let groupCount = lowerBound; groupCount <= requests.length; groupCount += 1) {
-    const solved = trySolveWithGroupCount(raid, requests, groupCount);
+  for (
+    let groupCount = lowerBound;
+    groupCount <= seededGroups.length + requests.length;
+    groupCount += 1
+  ) {
+    const solved = trySolveWithGroupCount(
+      raid,
+      requests,
+      groupCount,
+      seededGroups,
+    );
     if (solved) {
       return solved;
     }
   }
 
-  return requests.map((request) => ({
-    members: [request],
-    playerIds: new Set([request.playerId]),
-    classCounts: { [normalizeClassName(request.className)]: 1 },
-    dealerCount: request.role === "dealer" ? 1 : 0,
-    supportCount: request.role === "support" ? 1 : 0,
-  }));
+  return [
+    ...seededGroups,
+    ...requests.map((request) => ({
+      members: [request],
+      playerIds: new Set([request.playerId]),
+      classCounts: { [normalizeClassName(request.className)]: 1 },
+      dealerCount: request.role === "dealer" ? 1 : 0,
+      supportCount: request.role === "support" ? 1 : 0,
+    })),
+  ];
 };
 
 const trySolveWithGroupCount = (
   raid: RaidDefinition,
   requests: RaidRequest[],
   groupCount: number,
+  seededGroups: WorkingGroup[] = [],
 ) => {
   const buckets = bucketRequestsByPlayer(requests);
-  const groups: WorkingGroup[] = Array.from({ length: groupCount }, () => ({
-    members: [],
-    playerIds: new Set<string>(),
-    classCounts: {},
-    dealerCount: 0,
-    supportCount: 0,
-  }));
+  const groups: WorkingGroup[] = [
+    ...seededGroups.map((group) => ({
+      id: group.id,
+      members: [...group.members],
+      playerIds: new Set(group.playerIds),
+      classCounts: { ...group.classCounts },
+      dealerCount: group.dealerCount,
+      supportCount: group.supportCount,
+    })),
+    ...Array.from(
+      { length: Math.max(0, groupCount - seededGroups.length) },
+      () => ({
+        members: [],
+        playerIds: new Set<string>(),
+        classCounts: {},
+        dealerCount: 0,
+        supportCount: 0,
+      }),
+    ),
+  ];
 
   const assignPlayer = (bucketIndex: number): WorkingGroup[] | null => {
     if (bucketIndex >= buckets.length) {
       return groups.map((group) => ({
+        id: group.id,
         members: [...group.members],
         playerIds: new Set(group.playerIds),
         classCounts: { ...group.classCounts },
@@ -504,7 +576,7 @@ const finalizeGroup = (
   ];
 
   return {
-    id: `${raidName}-${index + 1}`,
+    id: group.id ?? `${raidName}-auto-${index + 1}`,
     raidName,
     size: raid.size,
     dealerSlots: raid.dealerSlots,

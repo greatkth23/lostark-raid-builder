@@ -7,6 +7,10 @@ import {
   type RaidGroupOperation,
   type RaidGroupRoom,
 } from "./raidData";
+import {
+  EMPTY_MANUAL_PARTY_LAYOUT,
+  normalizeManualPartyLayout,
+} from "./partyTypes";
 import { getRaidWeekKey } from "./raidWeek";
 
 const COOKIE_NAME = "lostark-raid-group-session";
@@ -59,7 +63,13 @@ export async function createRaidGroup(
           (id, name, password_salt, password_hash, data_json, revision)
          VALUES (?1, ?2, ?3, ?4, ?5, 1)`,
       )
-      .bind(id, name, salt, hash, JSON.stringify({ players }))
+      .bind(
+        id,
+        name,
+        salt,
+        hash,
+        JSON.stringify({ players, partyLayout: EMPTY_MANUAL_PARTY_LAYOUT }),
+      )
       .run();
   } catch (error) {
     if (error instanceof Error && error.message.includes("UNIQUE")) {
@@ -71,7 +81,11 @@ export async function createRaidGroup(
   const token = await createSession(id);
   return {
     token,
-    snapshot: toSnapshot({ id, name, revision: 1 }, players),
+    snapshot: toSnapshot(
+      { id, name, revision: 1 },
+      players,
+      EMPTY_MANUAL_PARTY_LAYOUT,
+    ),
   };
 }
 
@@ -140,19 +154,32 @@ export async function mutateRaidGroup(
       .first<Pick<RaidGroupRow, "id" | "name" | "data_json" | "revision">>();
     if (!row) throw new RaidGroupError("공격대를 찾을 수 없습니다.", 404);
 
-    const players = parsePlayers(row.data_json);
+    const state = parseRaidGroupData(row.data_json);
     const nextPlayers = applyRaidGroupOperation(
-      players,
+      state.players,
       operation,
       getRaidWeekKey(),
     );
+    const nextPartyLayout =
+      operation.type === "party.layout.set"
+        ? normalizeManualPartyLayout(operation.partyLayout)
+        : operation.type === "expedition.replaceMany" && operation.partyLayout
+          ? normalizeManualPartyLayout(operation.partyLayout)
+          : state.partyLayout;
     const result = await d1
       .prepare(
         `UPDATE raid_groups
          SET data_json = ?1, revision = revision + 1, updated_at = CURRENT_TIMESTAMP
          WHERE id = ?2 AND revision = ?3`,
       )
-      .bind(JSON.stringify({ players: nextPlayers }), roomId, row.revision)
+      .bind(
+        JSON.stringify({
+          players: nextPlayers,
+          partyLayout: nextPartyLayout,
+        }),
+        roomId,
+        row.revision,
+      )
       .run();
 
     if ((result.meta.changes ?? 0) === 1) {
@@ -250,23 +277,37 @@ const createSession = async (roomId: string) => {
 };
 
 const snapshotFromRow = (row: Pick<RaidGroupRow, "id" | "name" | "revision" | "data_json">) =>
-  toSnapshot(row, parsePlayers(row.data_json));
+  (() => {
+    const state = parseRaidGroupData(row.data_json);
+    return toSnapshot(row, state.players, state.partyLayout);
+  })();
 
 const toSnapshot = (
   room: RaidGroupRoom,
   players: Player[],
+  partyLayout: ReturnType<typeof normalizeManualPartyLayout>,
 ) => ({
   room: { id: room.id, name: room.name, revision: room.revision },
   players,
+  partyLayout,
   raidWeek: getRaidWeekKey(),
 });
 
-const parsePlayers = (json: string) => {
+const parseRaidGroupData = (json: string) => {
   try {
-    const parsed = JSON.parse(json) as { players?: unknown };
-    return normalizePlayers(parsed.players) ?? [];
+    const parsed = JSON.parse(json) as {
+      players?: unknown;
+      partyLayout?: unknown;
+    };
+    return {
+      players: normalizePlayers(parsed.players) ?? [],
+      partyLayout: normalizeManualPartyLayout(parsed.partyLayout),
+    };
   } catch {
-    return [];
+    return {
+      players: [],
+      partyLayout: EMPTY_MANUAL_PARTY_LAYOUT,
+    };
   }
 };
 

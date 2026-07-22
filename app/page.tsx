@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { CSSProperties } from "react";
 import lostarkGoldIcon from "../lostark_gold.png";
+import PartyPanel from "./components/PartyPanel";
 import {
   RAID_DEFINITIONS,
   SUPPORT_CLASS_NAMES,
@@ -23,6 +24,18 @@ import {
   type RaidPlanResult,
   type Role,
 } from "./lib/raidPlanner";
+import {
+  findPlanGroup,
+  movePartyMember,
+  planToManualLayout,
+  reconcileManualLayout,
+  swapPartyMember,
+} from "./lib/partyLayout";
+import {
+  EMPTY_MANUAL_PARTY_LAYOUT,
+  normalizeManualPartyLayout,
+  type ManualPartyLayout,
+} from "./lib/partyTypes";
 import {
   applyRaidGroupOperation,
   createExpedition,
@@ -124,6 +137,11 @@ export default function Home() {
   const [hydrated, setHydrated] = useState(false);
   const [generatedPlan, setGeneratedPlan] = useState<RaidPlanResult | null>(null);
   const [generatedFingerprint, setGeneratedFingerprint] = useState("");
+  const [manualPartyLayout, setManualPartyLayout] = useState<ManualPartyLayout>(
+    EMPTY_MANUAL_PARTY_LAYOUT,
+  );
+  const [completedPartyIds, setCompletedPartyIds] = useState<Set<string>>(new Set());
+  const [updatingParty, setUpdatingParty] = useState(false);
   const [notice, setNotice] = useState("");
   const [syncingId, setSyncingId] = useState("");
   const [pendingScrollPlayerId, setPendingScrollPlayerId] = useState("");
@@ -138,14 +156,30 @@ export default function Home() {
   const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const applySnapshot = useCallback(
-    (snapshot: { room: RaidGroupRoom; players: Player[]; raidWeek: string }) => {
+    (snapshot: {
+      room: RaidGroupRoom;
+      players: Player[];
+      raidWeek: string;
+      partyLayout?: ManualPartyLayout;
+    }) => {
       const normalized = normalizePlayers(snapshot.players) ?? [];
+      const nextLayout = normalizeManualPartyLayout(snapshot.partyLayout);
       snapshotRequestIdRef.current += 1;
       roomRef.current = snapshot.room;
       raidWeekRef.current = snapshot.raidWeek;
       setRoom(snapshot.room);
       setPlayers(normalized);
       setRaidWeek(snapshot.raidWeek);
+      setManualPartyLayout(nextLayout);
+      setGeneratedPlan((current) =>
+        current
+          ? buildRaidPlan(
+              buildCharacterInputs(normalized, snapshot.raidWeek),
+              nextLayout,
+            )
+          : current,
+      );
+      setGeneratedFingerprint(JSON.stringify(normalized));
     },
     [],
   );
@@ -284,23 +318,7 @@ export default function Home() {
   const favoritePlayerId = room ? favoritePlayersByRoom[room.id] ?? "" : "";
 
   const characterInputs = useMemo<CharacterInput[]>(
-    () =>
-      players.flatMap((player) =>
-        player.expeditions.flatMap((expedition) =>
-          expedition.characters.map((character) => ({
-            id: character.id,
-            playerId: player.id,
-            playerName: player.name.trim(),
-            characterName: character.name.trim(),
-            itemLevel: character.itemLevel,
-            className: character.className.trim(),
-            role: character.role,
-            selectedRaids: character.selectedRaids.filter(
-              (raidName) => character.raidCompletions[raidName] !== raidWeek,
-            ),
-          })),
-        ),
-      ),
+    () => buildCharacterInputs(players, raidWeek),
     [players, raidWeek],
   );
 
@@ -533,12 +551,106 @@ export default function Home() {
     setNotice("아이템 레벨 기준으로 레이드를 다시 자동 등록했습니다.");
   };
 
-  const generatePlan = () => {
-    const plan = buildRaidPlan(characterInputs);
+  const commitPartyPlan = (
+    plan: RaidPlanResult,
+    raidChanges: Extract<RaidGroupOperation, { type: "party.layout.set" }>["raidChanges"] = [],
+  ) => {
+    const partyLayout = planToManualLayout(plan);
+    const operation: RaidGroupOperation = {
+      type: "party.layout.set",
+      partyLayout,
+      raidChanges,
+    };
+    const nextPlayers = applyRaidGroupOperation(players, operation, raidWeekRef.current);
+    setPlayers(nextPlayers);
+    setManualPartyLayout(partyLayout);
     setGeneratedPlan(plan);
-    setGeneratedFingerprint(fingerprint);
+    setGeneratedFingerprint(JSON.stringify(nextPlayers));
+    queueMutation(operation);
+  };
+
+  const generatePlan = () => {
+    const reconciled = reconcileManualLayout(manualPartyLayout, characterInputs);
+    const plan = buildRaidPlan(characterInputs, reconciled);
+    commitPartyPlan(plan);
+    setGeneratedPlan(plan);
     setActiveTab("results");
+    setCompletedPartyIds(new Set());
     setNotice("");
+  };
+
+  const movePlanMember = (memberId: string, sourceGroupId: string, targetGroupId: string) => {
+    if (!generatedPlan) return;
+    const source = findPlanGroup(generatedPlan, sourceGroupId);
+    const target = findPlanGroup(generatedPlan, targetGroupId);
+    const result = movePartyMember(generatedPlan, memberId, sourceGroupId, targetGroupId);
+    if (!result.ok) {
+      setNotice(result.reason);
+      return;
+    }
+    if (
+      result.raidChanged &&
+      !window.confirm("다른 난이도로 이동하면 멤버 목록의 레이드 선택도 함께 변경됩니다. 이동할까요?")
+    ) return;
+    const location = locateCharacter(players, memberId);
+    const raidChanges = result.raidChanged && location && target
+      ? [{ ...location, raidName: target.raidName, checked: true }]
+      : [];
+    commitPartyPlan(result.plan, raidChanges);
+    setNotice(source && target ? `${source.raidName}에서 ${target.raidName} 파티로 이동했습니다.` : "파티를 이동했습니다.");
+  };
+
+  const swapPlanMember = (memberId: string, groupId: string, candidateId: string) => {
+    if (!generatedPlan) return;
+    const currentGroup = findPlanGroup(generatedPlan, groupId);
+    const candidateLocation = locateCharacter(players, candidateId);
+    const candidateCharacter = candidateLocation?.character;
+    if (!currentGroup || !candidateLocation || !candidateCharacter) return;
+    const candidateGroup = Object.values(generatedPlan.groupsByRaid)
+      .flat()
+      .find((group) =>
+        getRaidDefinition(group.raidName)?.family === getRaidDefinition(currentGroup.raidName)?.family &&
+        group.members.some((member) => member.id === candidateId),
+      );
+    const candidateMember = {
+      type: "character" as const,
+      id: candidateCharacter.id,
+      playerId: candidateLocation.playerId,
+      playerName: players.find((player) => player.id === candidateLocation.playerId)?.name ?? "",
+      characterName: candidateCharacter.name,
+      itemLevel: candidateCharacter.itemLevel,
+      combatPower: candidateCharacter.combatPower,
+      className: candidateCharacter.className,
+      role: candidateCharacter.role,
+    };
+    const result = swapPartyMember(
+      generatedPlan,
+      memberId,
+      groupId,
+      candidateMember,
+      candidateGroup?.id,
+    );
+    if (!result.ok) {
+      setNotice(result.reason);
+      return;
+    }
+    if (
+      result.raidChanged &&
+      !window.confirm("서로 다른 난이도의 캐릭터를 교환하면 멤버 목록의 레이드 선택도 함께 변경됩니다. 교환할까요?")
+    ) return;
+    const currentLocation = locateCharacter(players, memberId);
+    const raidChanges: NonNullable<Extract<RaidGroupOperation, { type: "party.layout.set" }>["raidChanges"]> = [];
+    if (candidateGroup) {
+      if (candidateGroup.raidName !== currentGroup.raidName && currentLocation) {
+        raidChanges.push({ ...candidateLocation, raidName: currentGroup.raidName, checked: true });
+        raidChanges.push({ ...currentLocation, raidName: candidateGroup.raidName, checked: true });
+      }
+    } else {
+      raidChanges.push({ ...candidateLocation, raidName: currentGroup.raidName, checked: true });
+      if (currentLocation) raidChanges.push({ ...currentLocation, raidName: currentGroup.raidName, checked: false });
+    }
+    commitPartyPlan(result.plan, raidChanges);
+    setNotice("캐릭터를 교환했습니다.");
   };
 
   const saveAppSettings = async ({
@@ -671,6 +783,59 @@ export default function Home() {
     setNotice(`원정대 ${syncedCount}개를 동기화했습니다.`);
   };
 
+  const updateAndCompose = async () => {
+    if (updatingParty) return;
+    setUpdatingParty(true);
+    setNotice("정보를 갱신하고 파티를 다시 구성하고 있습니다.");
+    const replacements: Array<{ playerId: string; expedition: Expedition }> = [];
+    let failedCount = 0;
+
+    if (apiKey.trim()) {
+      for (const player of players) {
+        for (const expedition of player.expeditions) {
+          if (!expedition.representativeName.trim()) continue;
+          try {
+            setSyncingId(`${player.id}:${expedition.id}`);
+            const roster = await fetchRoster(expedition.representativeName);
+            replacements.push({
+              playerId: player.id,
+              expedition: mergeRosterIntoExpedition(expedition, roster),
+            });
+          } catch {
+            failedCount += 1;
+          }
+        }
+      }
+    }
+
+    const rosterOperation: RaidGroupOperation = {
+      type: "expedition.replaceMany",
+      replacements,
+    };
+    const nextPlayers = applyRaidGroupOperation(players, rosterOperation, raidWeekRef.current);
+    const nextInputs = buildCharacterInputs(nextPlayers, raidWeekRef.current);
+    const reconciled = reconcileManualLayout(manualPartyLayout, nextInputs);
+    const nextPlan = buildRaidPlan(nextInputs, reconciled);
+    const partyLayout = planToManualLayout(nextPlan);
+    const operation: RaidGroupOperation = replacements.length
+      ? { type: "expedition.replaceMany", replacements, partyLayout }
+      : { type: "party.layout.set", partyLayout };
+
+    setPlayers(nextPlayers);
+    setManualPartyLayout(partyLayout);
+    setGeneratedPlan(nextPlan);
+    setGeneratedFingerprint(JSON.stringify(nextPlayers));
+    setCompletedPartyIds(new Set());
+    queueMutation(operation);
+    setSyncingId("");
+    setUpdatingParty(false);
+    setNotice(
+      apiKey.trim()
+        ? `원정대 ${replacements.length}개를 동기화하고 파티를 구성했습니다.${failedCount ? ` ${failedCount}개는 갱신하지 못했습니다.` : ""}`
+        : "API 키가 없어 기존 정보로 파티만 다시 구성했습니다.",
+    );
+  };
+
   const setRaidCompletion = (
     playerId: string,
     expeditionId: string,
@@ -686,6 +851,32 @@ export default function Home() {
       raidName,
       completed,
     });
+  };
+
+  const setPartyCompletion = (group: RaidGroup, completed: boolean) => {
+    const targets = group.members.flatMap((member) => {
+      const location = locateCharacter(players, member.id);
+      return location
+        ? [{
+            playerId: location.playerId,
+            expeditionId: location.expeditionId,
+            characterId: location.characterId,
+            raidName: group.raidName,
+          }]
+        : [];
+    });
+    if (!targets.length) return;
+    const operation: RaidGroupOperation = { type: "completion.batch", targets, completed };
+    const nextPlayers = applyRaidGroupOperation(players, operation, raidWeekRef.current);
+    setPlayers(nextPlayers);
+    setGeneratedFingerprint(JSON.stringify(nextPlayers));
+    setCompletedPartyIds((current) => {
+      const next = new Set(current);
+      if (completed) next.add(group.id);
+      else next.delete(group.id);
+      return next;
+    });
+    queueMutation(operation);
   };
 
   const resetRaidCompletions = () => {
@@ -823,11 +1014,18 @@ export default function Home() {
             onToggleFavorite={toggleFavoritePlayer}
           />
         ) : (
-          <ResultPanel
+          <PartyPanel
             plan={generatedPlan}
             players={players}
+            raidWeek={raidWeek}
+            favoritePlayerId={favoritePlayerId}
+            completedPartyIds={completedPartyIds}
             stale={isPlanStale}
-            onGenerate={generatePlan}
+            updating={updatingParty}
+            onUpdate={updateAndCompose}
+            onMove={movePlanMember}
+            onSwap={swapPlanMember}
+            onToggleComplete={setPartyCompletion}
           />
         )}
       </div>
@@ -843,7 +1041,12 @@ function RaidGroupGate({
   legacyPlayers: Player[] | null;
   notice: string;
   onEntered: (
-    snapshot: { room: RaidGroupRoom; players: Player[]; raidWeek: string },
+    snapshot: {
+      room: RaidGroupRoom;
+      players: Player[];
+      raidWeek: string;
+      partyLayout?: ManualPartyLayout;
+    },
     imported: boolean,
   ) => void;
 }) {
@@ -2721,6 +2924,8 @@ function RaidFamilySelector({
   );
 }
 
+// Kept temporarily for compatibility with older generated-result snapshots.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ResultPanel({
   plan,
   players,
@@ -2858,6 +3063,42 @@ function ResultRow({
     </tr>
   );
 }
+
+const buildCharacterInputs = (players: Player[], raidWeek: string): CharacterInput[] =>
+  players.flatMap((player) =>
+    player.expeditions.flatMap((expedition) =>
+      expedition.characters.map((character) => ({
+        id: character.id,
+        playerId: player.id,
+        playerName: player.name.trim(),
+        characterName: character.name.trim(),
+        itemLevel: character.itemLevel,
+        combatPower: character.combatPower,
+        className: character.className.trim(),
+        role: character.role,
+        selectedRaids: character.selectedRaids.filter(
+          (raidName) => character.raidCompletions[raidName] !== raidWeek,
+        ),
+      })),
+    ),
+  );
+
+const locateCharacter = (players: Player[], characterId: string) => {
+  for (const player of players) {
+    for (const expedition of player.expeditions) {
+      const character = expedition.characters.find((candidate) => candidate.id === characterId);
+      if (character) {
+        return {
+          playerId: player.id,
+          expeditionId: expedition.id,
+          characterId: character.id,
+          character,
+        };
+      }
+    }
+  }
+  return null;
+};
 
 const getRestorableCharacters = (expedition: Expedition) => {
   const seenNames = new Set<string>();
