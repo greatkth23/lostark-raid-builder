@@ -186,7 +186,7 @@ export const getGoldRecommendedRaidNames = (
       const preferredDiff =
         preference === "tradable"
           ? b.tradableGold - a.tradableGold
-          : b.boundGold - a.boundGold;
+          : b.gold - a.gold;
       return preferredDiff || b.gold - a.gold || compareRaidPriority(a, b);
     })
     .slice(0, 3)
