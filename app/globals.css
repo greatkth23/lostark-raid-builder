@@ -427,6 +427,10 @@ button:disabled {
   opacity: 0.48;
 }
 
+button:not(:disabled) {
+  cursor: pointer;
+}
+
 .cool-icon {
   display: inline-block;
   width: 1em;
