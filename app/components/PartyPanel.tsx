@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import lostarkGoldIcon from "../../lostark_gold.png";
 import { getRaidDefinition, roleLabel, type AssignedMember, type RaidGroup, type RaidPlanResult } from "../lib/raidPlanner";
 import { allPlanGroups, canPlaceMember, canReplaceMember } from "../lib/partyLayout";
@@ -158,7 +159,9 @@ export default function PartyPanel({
       return;
     }
 
-    setDepartingPartyIds((current) => new Set(current).add(group.id));
+    flushSync(() => {
+      setDepartingPartyIds((current) => new Set(current).add(group.id));
+    });
     onToggleComplete(group, true);
     const previousTimer = exitTimersRef.current.get(group.id);
     if (previousTimer) window.clearTimeout(previousTimer);
