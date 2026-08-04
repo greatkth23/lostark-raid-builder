@@ -12,6 +12,7 @@ type SwapState = { group: RaidGroup; member: AssignedMember } | null;
 type AddState = { group: RaidGroup; role: AssignedMember["role"] } | null;
 
 const PREFERENCE_KEY = "loiar-party-view-preferences-v1";
+const PARTY_EXIT_DURATION_MS = 360;
 const GOLD_ICON_URL = typeof lostarkGoldIcon === "string" ? lostarkGoldIcon : lostarkGoldIcon.src;
 
 type PartyPanelProps = {
@@ -79,6 +80,8 @@ export default function PartyPanel({
   const [dragging, setDragging] = useState<{ memberId: string; groupId: string } | null>(null);
   const [swapState, setSwapState] = useState<SwapState>(null);
   const [addState, setAddState] = useState<AddState>(null);
+  const [departingPartyIds, setDepartingPartyIds] = useState<Set<string>>(new Set());
+  const exitTimersRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -100,6 +103,11 @@ export default function PartyPanel({
     window.localStorage.setItem(PREFERENCE_KEY, JSON.stringify({ viewMode, nameMode }));
   }, [viewMode, nameMode]);
 
+  useEffect(() => () => {
+    exitTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
+    exitTimersRef.current.clear();
+  }, []);
+
   const groups = useMemo(() => plan ? allPlanGroups(plan) : [], [plan]);
   const completedIdsForRefreshRef = useRef(completedPartyIds);
   const [orderedGroupIds, setOrderedGroupIds] = useState(() =>
@@ -120,14 +128,20 @@ export default function PartyPanel({
     () => orderGroupsByIds(groups, orderedGroupIds),
     [groups, orderedGroupIds],
   );
+  const visibleGroups = useMemo(
+    () => displayGroups.filter((group) =>
+      !completedPartyIds.has(group.id) || departingPartyIds.has(group.id),
+    ),
+    [completedPartyIds, departingPartyIds, displayGroups],
+  );
   const groupsByFamily = useMemo(() => {
     const result = new Map<string, RaidGroup[]>();
-    displayGroups.forEach((group) => {
+    visibleGroups.forEach((group) => {
       const family = getRaidDefinition(group.raidName)?.family ?? group.raidName;
       result.set(family, [...(result.get(family) ?? []), group]);
     });
     return result;
-  }, [displayGroups]);
+  }, [visibleGroups]);
 
   const sortedPlayers = useMemo(() => [...players].sort((a, b) => {
     if (a.id === favoritePlayerId) return -1;
@@ -137,6 +151,27 @@ export default function PartyPanel({
 
   const displayName = (member: AssignedMember) =>
     nameMode === "character" ? member.characterName : member.playerName;
+
+  const handleToggleComplete = (group: RaidGroup, completed: boolean) => {
+    if (!completed) {
+      onToggleComplete(group, false);
+      return;
+    }
+
+    setDepartingPartyIds((current) => new Set(current).add(group.id));
+    onToggleComplete(group, true);
+    const previousTimer = exitTimersRef.current.get(group.id);
+    if (previousTimer) window.clearTimeout(previousTimer);
+    const timerId = window.setTimeout(() => {
+      setDepartingPartyIds((current) => {
+        const next = new Set(current);
+        next.delete(group.id);
+        return next;
+      });
+      exitTimersRef.current.delete(group.id);
+    }, PARTY_EXIT_DURATION_MS);
+    exitTimersRef.current.set(group.id, timerId);
+  };
 
   return (
     <section className="party-panel">
@@ -178,7 +213,7 @@ export default function PartyPanel({
         <div className="party-warning">{plan.warnings.join(" ")}</div>
       ) : null}
 
-      {!plan || groups.length === 0 ? (
+      {!plan || visibleGroups.length === 0 ? (
         <div className="party-empty">
           <strong>구성할 레이드가 없습니다.</strong>
           <span>멤버 목록에서 레이드를 선택한 뒤 자동구성을 눌러 주세요.</span>
@@ -191,6 +226,7 @@ export default function PartyPanel({
               family={family}
               groups={familyGroups}
               completedPartyIds={completedPartyIds}
+              departingPartyIds={departingPartyIds}
               displayName={displayName}
               dragging={dragging}
               onDragStart={setDragging}
@@ -201,14 +237,14 @@ export default function PartyPanel({
               }}
               onOpenSwap={(group, member) => setSwapState({ group, member })}
               onOpenAdd={(group, role) => setAddState({ group, role })}
-              onToggleComplete={onToggleComplete}
+              onToggleComplete={handleToggleComplete}
             />
           ))}
         </div>
       ) : (
         <div className="party-member-list">
           {sortedPlayers.map((player) => {
-            const playerGroups = displayGroups
+            const playerGroups = visibleGroups
               .filter((group) =>
                 group.members.some((member) => member.playerId === player.id),
               )
@@ -222,6 +258,7 @@ export default function PartyPanel({
                 groups={playerGroups}
                 allGroups={groups}
                 completedPartyIds={completedPartyIds}
+                departingPartyIds={departingPartyIds}
                 displayName={displayName}
                 dragging={dragging}
                 onDragStart={setDragging}
@@ -232,7 +269,7 @@ export default function PartyPanel({
                 }}
                 onOpenSwap={(group, member) => setSwapState({ group, member })}
                 onOpenAdd={(group, role) => setAddState({ group, role })}
-                onToggleComplete={onToggleComplete}
+                onToggleComplete={handleToggleComplete}
               />
             );
           })}
@@ -287,10 +324,11 @@ function SegmentedControl({ value, items, onChange, className = "" }: {
   );
 }
 
-function RaidFamilySection({ family, groups, completedPartyIds, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
+function RaidFamilySection({ family, groups, completedPartyIds, departingPartyIds, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
   family: string;
   groups: RaidGroup[];
   completedPartyIds: Set<string>;
+  departingPartyIds: Set<string>;
   displayName: (member: AssignedMember) => string;
   dragging: { memberId: string; groupId: string } | null;
   onDragStart: (value: { memberId: string; groupId: string }) => void;
@@ -312,6 +350,7 @@ function RaidFamilySection({ family, groups, completedPartyIds, displayName, dra
             group={group}
             groupIndex={groups.filter((candidate) => candidate.raidName === group.raidName).findIndex((candidate) => candidate.id === group.id) + 1}
             completed={completedPartyIds.has(group.id)}
+            departing={departingPartyIds.has(group.id)}
             displayName={displayName}
             dragging={dragging}
             onDragStart={onDragStart}
@@ -327,12 +366,13 @@ function RaidFamilySection({ family, groups, completedPartyIds, displayName, dra
   );
 }
 
-function MemberPartySection({ playerName, favorite, groups, allGroups, completedPartyIds, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
+function MemberPartySection({ playerName, favorite, groups, allGroups, completedPartyIds, departingPartyIds, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
   playerName: string;
   favorite: boolean;
   groups: RaidGroup[];
   allGroups: RaidGroup[];
   completedPartyIds: Set<string>;
+  departingPartyIds: Set<string>;
   displayName: (member: AssignedMember) => string;
   dragging: { memberId: string; groupId: string } | null;
   onDragStart: (value: { memberId: string; groupId: string }) => void;
@@ -354,6 +394,7 @@ function MemberPartySection({ playerName, favorite, groups, allGroups, completed
             group={group}
             groupIndex={allGroups.filter((candidate) => candidate.raidName === group.raidName).findIndex((candidate) => candidate.id === group.id) + 1}
             completed={completedPartyIds.has(group.id)}
+            departing={departingPartyIds.has(group.id)}
             displayName={displayName}
             dragging={dragging}
             onDragStart={onDragStart}
@@ -369,10 +410,11 @@ function MemberPartySection({ playerName, favorite, groups, allGroups, completed
   );
 }
 
-function PartyCard({ group, groupIndex, completed, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
+function PartyCard({ group, groupIndex, completed, departing, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
   group: RaidGroup;
   groupIndex: number;
   completed: boolean;
+  departing: boolean;
   displayName: (member: AssignedMember) => string;
   dragging: { memberId: string; groupId: string } | null;
   onDragStart: (value: { memberId: string; groupId: string }) => void;
@@ -386,13 +428,13 @@ function PartyCard({ group, groupIndex, completed, displayName, dragging, onDrag
   const arrangedSlots = arrangePartySlots(group);
   return (
     <article
-      className={`party-card ${completed ? "completed" : ""} ${dragging && dragging.groupId !== group.id ? "drop-ready" : ""}`.trim()}
+      className={`party-card ${completed ? "completed" : ""} ${departing ? "departing" : ""} ${dragging && dragging.groupId !== group.id ? "drop-ready" : ""}`.trim()}
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => { event.preventDefault(); onDrop(); }}
     >
       <div className="party-card-title">
         <h4>{group.raidName} {groupIndex}공대</h4>
-        <button className={completed ? "complete" : ""} type="button" onClick={() => onToggleComplete(group, !completed)}>
+        <button className={completed ? "complete" : ""} type="button" onClick={() => onToggleComplete(group, !completed)} disabled={departing}>
           <PartyIcon name={completed ? "circleCheck" : "circle"} />
           {completed ? "완료" : "미완료"}
         </button>
@@ -403,7 +445,7 @@ function PartyCard({ group, groupIndex, completed, displayName, dragging, onDrag
             <div
               className={`party-character-row ${member.role}`}
               key={member.id}
-              draggable={!completed}
+              draggable={!completed && !departing}
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = "move";
                 event.dataTransfer.setData("text/plain", `${group.id}:${member.id}`);
@@ -419,12 +461,12 @@ function PartyCard({ group, groupIndex, completed, displayName, dragging, onDrag
                 <PartyIcon name={member.role === "dealer" ? "dealer" : "shield"} />
                 {Math.trunc(member.combatPower).toLocaleString("ko-KR")}
               </span>
-              <button type="button" aria-label={`${displayName(member)} 캐릭터 교환`} onClick={() => onOpenSwap(group, member)} disabled={completed}>
+              <button type="button" aria-label={`${displayName(member)} 캐릭터 교환`} onClick={() => onOpenSwap(group, member)} disabled={completed || departing}>
                 <ArrowSwapIcon />
               </button>
             </div>
           ) : (
-            <button className={`party-empty-slot ${role}`} key={`${role}-empty-${index}`} type="button" onClick={() => onOpenAdd(group, role)} disabled={completed}>
+            <button className={`party-empty-slot ${role}`} key={`${role}-empty-${index}`} type="button" onClick={() => onOpenAdd(group, role)} disabled={completed || departing}>
               <span className="party-role-badge">{roleLabel(role)}</span>
               <span>+ 캐릭터 추가</span>
             </button>

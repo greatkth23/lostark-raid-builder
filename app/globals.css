@@ -200,6 +200,20 @@
   opacity: .68;
 }
 
+.party-card.departing {
+  pointer-events: none;
+  animation: party-card-fade-out 360ms ease forwards;
+}
+
+@keyframes party-card-fade-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(.98); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .party-card.departing { animation-duration: 1ms; }
+}
+
 .party-card-title {
   display: flex;
   align-items: center;
