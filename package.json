@@ -11,6 +11,7 @@
     "deploy:cloudflare": "npm run build && wrangler deploy --config dist/server/wrangler.json",
     "start": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "test": "vitest run --config vitest.config.ts",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
@@ -35,6 +36,7 @@
     "typescript": "5.9.3",
     "vinext": "0.0.50",
     "vite": "8.0.13",
+    "vitest": "^4.0.18",
     "wrangler": "4.92.0"
   },
   "type": "module"

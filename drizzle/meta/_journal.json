@@ -15,6 +15,13 @@
       "when": 1784718249754,
       "tag": "0001_spotty_kat_farrell",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785830356668,
+      "tag": "0002_late_maximus",
+      "breakpoints": true
     }
   ]
 }

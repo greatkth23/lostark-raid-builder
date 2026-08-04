@@ -57,3 +57,17 @@ export const lostarkApiUsage = sqliteTable(
     index("lostark_api_usage_window_idx").on(table.windowStart),
   ],
 );
+
+export const lostarkMarketCache = sqliteTable(
+  "lostark_market_cache",
+  {
+    itemKey: text("item_key").primaryKey(),
+    itemId: integer("item_id").notNull(),
+    name: text("name").notNull(),
+    icon: text("icon").notNull(),
+    bundleCount: integer("bundle_count").notNull(),
+    currentMinPrice: integer("current_min_price").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [index("lostark_market_cache_updated_idx").on(table.updatedAt)],
+);

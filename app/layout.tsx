@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Image from "next/image";
+import GlobalHeader from "./components/GlobalHeader";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,17 +20,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        <header className="brand-header">
-          <div className="brand-header-inner">
-            <Image
-              src="/loiar-logotype.svg"
-              alt="LOIAR"
-              width={290}
-              height={105}
-              priority
-            />
-          </div>
-        </header>
+        <GlobalHeader />
         {children}
       </body>
     </html>

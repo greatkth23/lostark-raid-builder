@@ -66,6 +66,20 @@ export function ensureDatabase() {
         d1.prepare(
           "CREATE INDEX IF NOT EXISTS lostark_api_usage_window_idx ON lostark_api_usage (window_start)",
         ),
+        d1.prepare(`
+          CREATE TABLE IF NOT EXISTS lostark_market_cache (
+            item_key TEXT PRIMARY KEY NOT NULL,
+            item_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            icon TEXT NOT NULL,
+            bundle_count INTEGER NOT NULL,
+            current_min_price REAL NOT NULL,
+            updated_at INTEGER NOT NULL
+          )
+        `),
+        d1.prepare(
+          "CREATE INDEX IF NOT EXISTS lostark_market_cache_updated_idx ON lostark_market_cache (updated_at)",
+        ),
       ])
       .catch((error: unknown) => {
         initialization = null;
