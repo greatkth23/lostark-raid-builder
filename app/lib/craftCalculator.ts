@@ -265,13 +265,13 @@ function prepareSource(
     };
   }
 
-  const sellableBundles = Math.floor(quantity / quote.bundleCount);
+  const unitOpportunityCost = quote.currentMinPrice / quote.bundleCount;
   return {
     key,
     required: quantity,
     prepared: quantity,
-    remainder: quantity - sellableBundles * quote.bundleCount,
-    cost: sellableBundles * quote.currentMinPrice * 0.95,
+    remainder: 0,
+    cost: quantity * unitOpportunityCost * 0.95,
   };
 }
 
@@ -306,7 +306,7 @@ function toExchangeSteps(
     steps.push({
       label: `${advanced} → ${common}`,
       sets,
-      detail: `${advanced} ${sets * 25}개를 ${common} ${sets * 50}개로 교환`,
+      detail: `${advanced} ${formatExchangeQuantity(sets * 25)}개를 ${common} ${formatExchangeQuantity(sets * 50)}개로 교환`,
     });
   }
   if (candidate.commonPlan.specialConversionSets > 0 && life.special) {
@@ -315,25 +315,28 @@ function toExchangeSteps(
     steps.push({
       label: `${special} → ${common}`,
       sets,
-      detail: `${special} ${sets * 5}개를 ${common} ${sets * 50}개로 교환`,
+      detail: `${special} ${formatExchangeQuantity(sets * 5)}개를 ${common} ${formatExchangeQuantity(sets * 50)}개로 교환`,
     });
   }
   if (candidate.commonToPowderSets > 0) {
     steps.push({
       label: `${common} → ${life.powderName}`,
       sets: candidate.commonToPowderSets,
-      detail: `${common} ${candidate.commonToPowderSets * 100}개를 ${life.powderName} ${candidate.commonToPowderSets * 80}개로 교환`,
+      detail: `${common} ${formatExchangeQuantity(candidate.commonToPowderSets * 100)}개를 ${life.powderName} ${formatExchangeQuantity(candidate.commonToPowderSets * 80)}개로 교환`,
     });
   }
   if (candidate.rareExchangeSets > 0) {
     steps.push({
       label: `${life.powderName} → ${rare}`,
       sets: candidate.rareExchangeSets,
-      detail: `${life.powderName} ${candidate.rareExchangeSets * 100}개를 ${rare} ${candidate.rareExchangeSets * 10}개로 교환${candidate.powderRemainder > 0 ? ` · 가루 ${candidate.powderRemainder}개 잔여` : ""}`,
+      detail: `${life.powderName} ${formatExchangeQuantity(candidate.rareExchangeSets * 100)}개를 ${rare} ${formatExchangeQuantity(candidate.rareExchangeSets * 10)}개로 교환${candidate.powderRemainder > 0 ? ` · 가루 ${formatExchangeQuantity(candidate.powderRemainder)}개 잔여` : ""}`,
     });
   }
   return steps;
 }
+
+const formatExchangeQuantity = (value: number) =>
+  new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 }).format(value);
 
 function mergeSources(sources: PreparedSource[]) {
   const merged = new Map<MarketItemKey, PreparedSource>();

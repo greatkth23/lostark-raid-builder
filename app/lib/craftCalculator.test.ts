@@ -112,7 +112,7 @@ describe("craft calculator", () => {
     expect(rare?.remainderQuantity).toBe(67);
   });
 
-  it("counts only complete sellable bundles as self-gather opportunity cost", () => {
+  it("counts every gathered item as self-gather opportunity cost", () => {
     const quotes = makeQuotes(
       Object.fromEntries(
         MARKET_ITEM_CATALOG.map((item) => [
@@ -131,8 +131,32 @@ describe("craft calculator", () => {
       quotes,
     ).find((item) => item.lifeKey === "archaeology");
 
-    expect(result?.materialCost).toBe(0);
-    expect(result?.acquisitionLines.every((line) => line.cost === 0)).toBe(true);
+    const rare = result?.acquisitionLines.find(
+      (line) => line.key === "archaeologyRare",
+    );
+    expect(rare?.requiredQuantity).toBe(33);
+    expect(rare?.preparedQuantity).toBe(33);
+    expect(rare?.remainderQuantity).toBe(0);
+    expect(rare?.cost).toBeCloseTo(33 * 0.95);
+    expect(result?.materialCost).toBeGreaterThan(0);
+  });
+
+  it("formats large exchange quantities with thousands separators", () => {
+    const result = calculateCraftResults(
+      "advancedAbidos",
+      { ...DEFAULT_CRAFT_SETTINGS, setCount: 1_000 },
+      makeQuotes({
+        loggingRare: { currentMinPrice: 1 },
+        loggingAdvanced: { currentMinPrice: 1_000 },
+        loggingCommon: { currentMinPrice: 1_000 },
+        loggingSpecial: { currentMinPrice: 1 },
+      }),
+    ).find((item) => item.lifeKey === "logging");
+    const exchange = result?.exchangeSteps.find((step) =>
+      step.label.includes("튼튼한 목재"),
+    );
+
+    expect(exchange?.detail).toMatch(/\d{1,3}(?:,\d{3})+개/);
   });
 
   it("uses the logging special material when it is the cheapest common source", () => {

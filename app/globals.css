@@ -811,21 +811,43 @@ button:not(:disabled) {
 }
 
 .craft-choice-grid button {
+  appearance: none;
+  -webkit-appearance: none;
   display: inline-flex;
   min-width: 0;
   min-height: 34px;
   align-items: center;
   justify-content: center;
   border: 0;
+  border-radius: 0;
   background: #fff;
+  background-image: none;
   padding: 0 7px;
   color: #667085;
   font-size: var(--craft-font-xs);
+  box-shadow: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .craft-choice-grid button.active {
   background: #172033;
   color: #fff;
+}
+
+.craft-choice-grid button:focus {
+  outline: 0;
+}
+
+.craft-choice-grid button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #475569;
+  outline-offset: -2px;
+}
+
+.craft-choice-grid button::-moz-focus-inner {
+  border: 0;
+  padding: 0;
 }
 
 .craft-settings-note {
@@ -951,7 +973,7 @@ button:not(:disabled) {
 }
 
 .craft-profit {
-  color: var(--craft-gold);
+  color: #101828;
   font-size: var(--craft-font-md);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
@@ -1074,7 +1096,7 @@ button:not(:disabled) {
 }
 
 .craft-cost,
-.craft-positive { color: var(--craft-gold); }
+.craft-positive { color: #f79728; }
 
 .craft-net-row {
   display: flex;
@@ -1088,7 +1110,9 @@ button:not(:disabled) {
 }
 
 .craft-net-row .craft-profit {
-  font-size: var(--craft-font-lg);
+  color: #f79728;
+  font-size: inherit;
+  font-weight: 400;
 }
 
 .craft-method-panel {
@@ -1109,7 +1133,7 @@ button:not(:disabled) {
   height: 17px;
   margin-top: 1px;
   flex: 0 0 auto;
-  background: var(--craft-gold);
+  background: #101828;
   mask: url("/icons/arrow-left-right.svg") center / contain no-repeat;
   -webkit-mask: url("/icons/arrow-left-right.svg") center / contain no-repeat;
 }
@@ -1166,9 +1190,9 @@ button:not(:disabled) {
   font-size: var(--craft-font-xs);
 }
 
-.craft-method-panel li b {
-  color: var(--craft-gold);
-  font-weight: 650;
+.craft-method-sets {
+  color: #f79728;
+  font-weight: 600;
 }
 
 .craft-method-panel li small {

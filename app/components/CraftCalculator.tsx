@@ -304,7 +304,7 @@ export default function CraftCalculator() {
                   <span>계산 기준</span>
                   {settings.sourceMode === "market"
                     ? "구매 묶음은 필요한 수량 이상으로 올림합니다."
-                    : "판매 가능한 완전한 묶음만 기회비용에 반영합니다."}
+                    : "거래소 묶음 가격을 개당 단가로 환산해 1개까지 기회비용에 반영합니다."}
                 </div>
               </aside>
 
@@ -465,7 +465,9 @@ function CraftResultAccordion({
                 {result.exchangeSteps.map((step) => (
                   <li key={`${step.label}-${step.sets}`}>
                     <span>{step.label}</span>
-                    <b>{step.sets}세트</b>
+                    <span className="craft-method-sets">
+                      {formatNumber(step.sets)}세트
+                    </span>
                     <small>{step.detail}</small>
                   </li>
                 ))}
