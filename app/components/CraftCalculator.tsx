@@ -19,6 +19,8 @@ import type {
 } from "../lib/craftTypes";
 
 const SETTINGS_KEY = "loiar-craft-settings-v1";
+const MARKET_CACHE_KEY = "loiar-craft-market-v1";
+const MARKET_AUTO_REFRESH_INTERVAL_MS = 60_000;
 const FUSION_KINDS: FusionKind[] = ["abidos", "advancedAbidos"];
 const GOLD_ICON_URL =
   typeof lostarkGoldIcon === "string" ? lostarkGoldIcon : lostarkGoldIcon.src;
@@ -51,6 +53,14 @@ export default function CraftCalculator() {
         );
       }
       setMarket(payload);
+      try {
+        window.localStorage.setItem(
+          MARKET_CACHE_KEY,
+          JSON.stringify({ fetchedAt: Date.now(), market: payload }),
+        );
+      } catch {
+        // Storage availability must not turn a successful market response into an error.
+      }
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -64,6 +74,7 @@ export default function CraftCalculator() {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      let hasFreshMarketCache = false;
       try {
         const saved = window.localStorage.getItem(SETTINGS_KEY);
         if (saved) {
@@ -74,7 +85,31 @@ export default function CraftCalculator() {
       } finally {
         setSettingsReady(true);
       }
-      void loadMarket();
+
+      try {
+        const cached = window.localStorage.getItem(MARKET_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached) as {
+            fetchedAt?: number;
+            market?: CraftMarketResponse;
+          };
+          const cacheAge = Date.now() - (parsed.fetchedAt ?? 0);
+          if (isCraftMarketResponse(parsed.market)) {
+            setMarket(parsed.market);
+            if (
+              cacheAge >= 0 &&
+              cacheAge < MARKET_AUTO_REFRESH_INTERVAL_MS
+            ) {
+              setLoading(false);
+              hasFreshMarketCache = true;
+            }
+          }
+        }
+      } catch {
+        window.localStorage.removeItem(MARKET_CACHE_KEY);
+      }
+
+      if (!hasFreshMarketCache) void loadMarket();
     }, 0);
     return () => window.clearTimeout(timer);
   }, [loadMarket]);
@@ -640,3 +675,14 @@ const formatUpdatedAt = (value: string) =>
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+
+const isCraftMarketResponse = (
+  value: CraftMarketResponse | undefined,
+): value is CraftMarketResponse =>
+  Boolean(
+    value &&
+      typeof value.updatedAt === "string" &&
+      typeof value.stale === "boolean" &&
+      value.items &&
+      typeof value.items === "object",
+  );

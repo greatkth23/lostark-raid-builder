@@ -488,9 +488,14 @@ button:not(:disabled) {
 /* Craft profitability workspace */
 .craft-page {
   --craft-gold: #D97706;
+  --craft-font-xs: 12pt;
+  --craft-font-sm: 14pt;
+  --craft-font-md: 16pt;
+  --craft-font-lg: 18pt;
   min-height: 100vh;
   background: #fff;
   color: #172033;
+  font-size: var(--craft-font-sm);
   padding-top: 56px;
 }
 
@@ -528,7 +533,7 @@ button:not(:disabled) {
   background: #fff;
   padding: 0 12px;
   color: #27364b;
-  font-size: 13px;
+  font-size: var(--craft-font-xs);
 }
 
 .craft-refresh-button:hover:not(:disabled) {
@@ -563,7 +568,7 @@ button:not(:disabled) {
   gap: 7px;
   margin-bottom: 19px;
   color: #738096;
-  font-size: 11px;
+  font-size: var(--craft-font-xs);
 }
 
 .craft-market-status.stale {
@@ -644,7 +649,7 @@ button:not(:disabled) {
 .craft-product-copy > span {
   overflow: hidden;
   color: #172033;
-  font-size: 16px;
+  font-size: var(--craft-font-md);
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -653,12 +658,12 @@ button:not(:disabled) {
 .craft-product-copy small,
 .craft-summary-profit small {
   color: #7a879b;
-  font-size: 11px;
+  font-size: var(--craft-font-xs);
   font-weight: 400;
 }
 
 .craft-product-selector .craft-profit {
-  font-size: 18px;
+  font-size: var(--craft-font-lg);
 }
 
 .craft-workspace {
@@ -693,7 +698,7 @@ button:not(:disabled) {
 .craft-results-heading h2 {
   margin: 0;
   color: #101828;
-  font-size: 17px;
+  font-size: var(--craft-font-lg);
   font-weight: 650;
 }
 
@@ -701,7 +706,7 @@ button:not(:disabled) {
 .craft-results-heading p {
   margin: 4px 0 0;
   color: #7b8798;
-  font-size: 11px;
+  font-size: var(--craft-font-xs);
   line-height: 1.45;
 }
 
@@ -731,13 +736,13 @@ button:not(:disabled) {
   justify-content: space-between;
   gap: 8px;
   color: #344054;
-  font-size: 12px;
+  font-size: var(--craft-font-sm);
   font-weight: 600;
 }
 
 .craft-setting-label small {
   color: #8995a6;
-  font-size: 10px;
+  font-size: var(--craft-font-xs);
   font-weight: 400;
 }
 
@@ -766,7 +771,7 @@ button:not(:disabled) {
   background: transparent;
   color: #182230;
   font: inherit;
-  font-size: 12px;
+  font-size: var(--craft-font-sm);
   outline: 0;
 }
 
@@ -779,7 +784,7 @@ button:not(:disabled) {
 .craft-number-control > span {
   padding-right: 10px;
   color: #667085;
-  font-size: 11px;
+  font-size: var(--craft-font-xs);
 }
 
 .craft-set-select {
@@ -793,7 +798,7 @@ button:not(:disabled) {
 .craft-choice-field legend {
   margin-bottom: 8px;
   color: #344054;
-  font-size: 12px;
+  font-size: var(--craft-font-sm);
   font-weight: 600;
 }
 
@@ -817,7 +822,7 @@ button:not(:disabled) {
   background: #fff;
   padding: 0 7px;
   color: #667085;
-  font-size: 11px;
+  font-size: var(--craft-font-xs);
 }
 
 .craft-choice-grid button:last-child {
@@ -846,7 +851,7 @@ button:not(:disabled) {
   background: #f8fafc;
   padding: 10px 11px;
   color: #667085;
-  font-size: 10px;
+  font-size: var(--craft-font-xs);
   line-height: 1.55;
 }
 
@@ -876,7 +881,7 @@ button:not(:disabled) {
   background: #f1f5f9;
   padding: 5px 9px;
   color: #667085;
-  font-size: 10px;
+  font-size: var(--craft-font-xs);
 }
 
 .craft-accordion-list {
@@ -931,7 +936,7 @@ button:not(:disabled) {
   border-radius: 7px;
   background: #fff;
   color: var(--craft-gold);
-  font-size: 10px;
+  font-size: var(--craft-font-xs);
   font-variant-numeric: tabular-nums;
   letter-spacing: .05em;
 }
@@ -947,7 +952,7 @@ button:not(:disabled) {
 .craft-life-title > span {
   overflow: hidden;
   color: #182230;
-  font-size: 14px;
+  font-size: var(--craft-font-md);
   font-weight: 620;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -955,7 +960,7 @@ button:not(:disabled) {
 
 .craft-life-title small {
   color: #7c899c;
-  font-size: 10px;
+  font-size: var(--craft-font-xs);
   font-weight: 400;
 }
 
@@ -965,7 +970,7 @@ button:not(:disabled) {
 
 .craft-profit {
   color: var(--craft-gold);
-  font-size: 14px;
+  font-size: var(--craft-font-md);
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1013,7 +1018,7 @@ button:not(:disabled) {
 .craft-ledger-label {
   padding-top: 5px;
   color: #667085;
-  font-size: 11px;
+  font-size: var(--craft-font-sm);
   font-weight: 650;
 }
 
@@ -1038,7 +1043,7 @@ button:not(:disabled) {
   align-items: center;
   gap: 8px;
   color: #344054;
-  font-size: 12px;
+  font-size: var(--craft-font-sm);
 }
 
 .craft-material-name img,
@@ -1069,7 +1074,7 @@ button:not(:disabled) {
 
 .craft-material-name small {
   color: #8a96a7;
-  font-size: 9px;
+  font-size: var(--craft-font-xs);
 }
 
 .craft-gold-icon {
@@ -1081,7 +1086,7 @@ button:not(:disabled) {
 .craft-cost,
 .craft-positive {
   flex: 0 0 auto;
-  font-size: 12px;
+  font-size: var(--craft-font-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1096,12 +1101,12 @@ button:not(:disabled) {
   gap: 16px;
   padding: 15px 0 0;
   color: #344054;
-  font-size: 12px;
+  font-size: var(--craft-font-sm);
   font-weight: 650;
 }
 
 .craft-net-row .craft-profit {
-  font-size: 17px;
+  font-size: var(--craft-font-lg);
 }
 
 .craft-method-panel {
@@ -1130,14 +1135,14 @@ button:not(:disabled) {
 .craft-method-heading h3 {
   margin: 0;
   color: #344054;
-  font-size: 12px;
+  font-size: var(--craft-font-md);
   font-weight: 700;
 }
 
 .craft-method-heading p {
   margin: 3px 0 0;
   color: #8a96a7;
-  font-size: 9px;
+  font-size: var(--craft-font-xs);
 }
 
 .craft-method-panel ol {
@@ -1160,7 +1165,7 @@ button:not(:disabled) {
   background: rgb(255 255 255 / 88%);
   padding: 9px 10px 9px 34px;
   color: #475467;
-  font-size: 10px;
+  font-size: var(--craft-font-sm);
   counter-increment: craft-step;
 }
 
@@ -1176,7 +1181,7 @@ button:not(:disabled) {
   background: #172033;
   color: #fff;
   content: counter(craft-step);
-  font-size: 8px;
+  font-size: var(--craft-font-xs);
 }
 
 .craft-method-panel li b {
@@ -1187,7 +1192,7 @@ button:not(:disabled) {
 .craft-method-panel li small {
   grid-column: 1 / -1;
   color: #8a96a7;
-  font-size: 8px;
+  font-size: var(--craft-font-xs);
   line-height: 1.45;
 }
 
@@ -1197,7 +1202,7 @@ button:not(:disabled) {
   background: rgb(255 255 255 / 78%);
   padding: 12px;
   color: #7a8799;
-  font-size: 10px;
+  font-size: var(--craft-font-xs);
   line-height: 1.55;
 }
 
@@ -1212,10 +1217,10 @@ button:not(:disabled) {
   background: #fff7f7;
   padding: 14px 16px;
   color: #991b1b;
-  font-size: 12px;
+  font-size: var(--craft-font-sm);
 }
 
-.craft-error strong { font-size: 13px; }
+.craft-error strong { font-size: var(--craft-font-md); }
 .craft-error p { margin: 3px 0 0; }
 .craft-error button {
   min-height: 31px;
@@ -1225,7 +1230,7 @@ button:not(:disabled) {
   background: #fff;
   padding: 0 10px;
   color: #991b1b;
-  font-size: 11px;
+  font-size: var(--craft-font-xs);
 }
 
 .craft-skeleton > div,
@@ -1283,17 +1288,19 @@ button:not(:disabled) {
 
   .craft-page-heading {
     align-items: flex-start;
+    gap: 10px;
   }
 
   .craft-page-heading h1 {
     max-width: 270px;
+    min-width: 0;
     font-size: 23px;
   }
 
   .craft-refresh-button {
     min-width: 34px;
     padding: 0 9px;
-    font-size: 0;
+    font-size: var(--craft-font-xs);
   }
 
   .craft-product-selector {
@@ -1318,12 +1325,12 @@ button:not(:disabled) {
   }
 
   .craft-product-copy > span {
-    font-size: 13px;
+    font-size: var(--craft-font-md);
   }
 
   .craft-product-selector .craft-profit {
     grid-column: 1 / -1;
-    font-size: 14px;
+    font-size: var(--craft-font-lg);
   }
 
   .craft-settings-panel {
@@ -1379,7 +1386,7 @@ button:not(:disabled) {
   }
 
   .craft-material-name {
-    font-size: 11px;
+    font-size: var(--craft-font-sm);
   }
 
   .craft-material-name img,
@@ -1391,7 +1398,7 @@ button:not(:disabled) {
 
   .craft-cost,
   .craft-positive {
-    font-size: 11px;
+    font-size: var(--craft-font-sm);
   }
 
   .craft-net-row {
