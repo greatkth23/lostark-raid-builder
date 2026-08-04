@@ -488,10 +488,10 @@ button:not(:disabled) {
 /* Craft profitability workspace */
 .craft-page {
   --craft-gold: #D97706;
-  --craft-font-xs: 12pt;
-  --craft-font-sm: 14pt;
-  --craft-font-md: 16pt;
-  --craft-font-lg: 18pt;
+  --craft-font-xs: 12px;
+  --craft-font-sm: 14px;
+  --craft-font-md: 16px;
+  --craft-font-lg: 18px;
   min-height: 100vh;
   background: #fff;
   color: #172033;
