@@ -912,13 +912,13 @@ button:not(:disabled) {
   display: grid;
   width: 100%;
   min-width: 0;
-  min-height: 96px;
-  grid-template-columns: 72px minmax(0, 1fr) auto 16px;
+  min-height: 74px;
+  grid-template-columns: 42px minmax(0, 1fr) auto 16px;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   border: 0;
   background: #fff;
-  padding: 12px 16px;
+  padding: 12px 10px;
   text-align: left;
 }
 
@@ -939,7 +939,7 @@ button:not(:disabled) {
   border-radius: 0;
   background: transparent;
   color: #101828;
-  font-size: 48px;
+  font-size: 28px;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
