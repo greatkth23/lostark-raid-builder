@@ -291,7 +291,7 @@ export default function CraftCalculator() {
                   onChange={(value) => updateSettings("sourceMode", value)}
                 />
                 <SegmentedField<Disposition>
-                  label="제작품 처분"
+                  label="직접 사용 여부"
                   value={settings.disposition}
                   options={[
                     { value: "sell", label: "거래소 판매" },
@@ -618,7 +618,6 @@ function SegmentedField<T extends string>({
             onClick={() => onChange(option.value)}
             aria-pressed={value === option.value}
           >
-            <span className="craft-radio-mark" />
             {option.label}
           </button>
         ))}
