@@ -12,7 +12,7 @@ type SwapState = { group: RaidGroup; member: AssignedMember } | null;
 type AddState = { group: RaidGroup; role: AssignedMember["role"] } | null;
 
 const PREFERENCE_KEY = "loiar-party-view-preferences-v1";
-const PARTY_EXIT_DURATION_MS = 360;
+const PARTY_EXIT_DURATION_MS = 520;
 const GOLD_ICON_URL = typeof lostarkGoldIcon === "string" ? lostarkGoldIcon : lostarkGoldIcon.src;
 
 type PartyPanelProps = {

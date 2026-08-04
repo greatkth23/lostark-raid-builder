@@ -202,12 +202,15 @@
 
 .party-card.departing {
   pointer-events: none;
-  animation: party-card-fade-out 360ms ease forwards;
+  transform-origin: left center;
+  will-change: opacity, transform;
+  animation: party-card-fade-out 520ms cubic-bezier(.4, 0, .2, 1) forwards;
 }
 
 @keyframes party-card-fade-out {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to { opacity: 0; transform: translateY(8px) scale(.98); }
+  0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  18% { opacity: 1; transform: translate3d(-4px, 0, 0) scale(1); }
+  100% { opacity: 0; transform: translate3d(-64px, 0, 0) scale(.985); }
 }
 
 @media (prefers-reduced-motion: reduce) {
