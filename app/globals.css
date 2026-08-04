@@ -955,6 +955,10 @@ button:not(:disabled) {
   gap: 4px;
 }
 
+.craft-life-title {
+  margin-left: 12px;
+}
+
 .craft-life-title > span {
   overflow: hidden;
   color: #182230;
@@ -1377,6 +1381,10 @@ button:not(:disabled) {
 
   .craft-life-title small {
     white-space: normal;
+  }
+
+  .craft-life-title {
+    margin-left: 3px;
   }
 
   .craft-ledger {
