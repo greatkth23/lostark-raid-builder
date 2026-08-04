@@ -52,7 +52,7 @@ export const DEFAULT_CRAFT_SETTINGS: CraftSettings = {
 export function normalizeCraftSettings(value: Partial<CraftSettings>): CraftSettings {
   return {
     feeReductionPct: clampNumber(value.feeReductionPct, 0, 100, 14),
-    extraGreatSuccessPct: clampNumber(value.extraGreatSuccessPct, 0, 95, 7),
+    extraGreatSuccessPct: clampNumber(value.extraGreatSuccessPct, 0, 1_900, 7),
     setCount: Math.round(clampNumber(value.setCount, 1, 1_000, 30)),
     sourceMode: value.sourceMode === "self" ? "self" : "market",
     disposition: value.disposition === "use" ? "use" : "sell",
@@ -69,7 +69,7 @@ export function calculateCraftResults(
   const product = requireQuote(quotes, recipe.product);
   const totalGreatSuccess = Math.min(
     1,
-    0.05 + settings.extraGreatSuccessPct / 100,
+    0.05 * (1 + settings.extraGreatSuccessPct / 100),
   );
   const expectedOutput =
     settings.setCount * recipe.output * (1 + totalGreatSuccess);
@@ -124,108 +124,122 @@ function findBestPlan(
   quotes: QuoteMap,
   sourceMode: SourceMode,
 ) {
-  const maxRareExchangeSets = Math.ceil(required.rare / 10);
-  const rareCandidates = candidateRange(maxRareExchangeSets, 640, 80);
-  let best: CandidatePlan | null = null;
+  const commonSource = findCheapestCommonSource(life, quotes, sourceMode);
+  const directRareUnitCost = getSourceUnitCost(life.rare, quotes, sourceMode);
+  const exchangedRareUnitCost = commonSource.unitCost * 12.5;
+  const rareExchangeSets =
+    exchangedRareUnitCost < directRareUnitCost
+      ? Math.ceil(required.rare / 10)
+      : 0;
+  const directRare = rareExchangeSets > 0 ? 0 : required.rare;
+  const powderNeeded = rareExchangeSets * 100;
+  const commonToPowderSets = Math.ceil(powderNeeded / 80);
+  const powderRemainder = commonToPowderSets * 80 - powderNeeded;
+  const commonNeeded = required.common + commonToPowderSets * 100;
+  const rareSource = prepareSource(
+    life.rare,
+    directRare,
+    quotes,
+    sourceMode,
+  );
+  const commonPlan = prepareCommonSources(
+    life,
+    required.advanced,
+    commonNeeded,
+    commonSource.kind,
+    quotes,
+    sourceMode,
+  );
 
-  for (const rareExchangeSets of rareCandidates) {
-    const directRare = Math.max(0, required.rare - rareExchangeSets * 10);
-    const powderNeeded = rareExchangeSets * 100;
-    const commonToPowderSets = Math.ceil(powderNeeded / 80);
-    const powderRemainder = commonToPowderSets * 80 - powderNeeded;
-    const commonNeeded = required.common + commonToPowderSets * 100;
-    const rareSource = prepareSource(
-      life.rare,
-      directRare,
-      quotes,
-      sourceMode,
-    );
-    const commonPlan = optimizeCommonSources(
-      life,
-      required.advanced,
-      commonNeeded,
-      quotes,
-      sourceMode,
-    );
-    const cost = rareSource.cost + commonPlan.cost;
-
-    if (!best || cost < best.cost) {
-      best = {
-        cost,
-        rareExchangeSets,
-        commonToPowderSets,
-        powderRemainder,
-        commonPlan,
-        sources: mergeSources([rareSource, ...commonPlan.sources]),
-      };
-    }
-  }
-
-  if (!best) throw new Error(`${life.name} 제작 경로를 계산하지 못했습니다.`);
-  return best;
+  return {
+    cost: rareSource.cost + commonPlan.cost,
+    rareExchangeSets,
+    commonToPowderSets,
+    powderRemainder,
+    commonPlan,
+    sources: mergeSources([rareSource, ...commonPlan.sources]),
+  } satisfies CandidatePlan;
 }
 
-function optimizeCommonSources(
+function findCheapestCommonSource(
+  life: LifeDefinition,
+  quotes: QuoteMap,
+  sourceMode: SourceMode,
+) {
+  const candidates: Array<{
+    kind: "direct" | "advanced" | "special";
+    unitCost: number;
+  }> = [
+    {
+      kind: "direct",
+      unitCost: getSourceUnitCost(life.common, quotes, sourceMode),
+    },
+    {
+      kind: "advanced",
+      unitCost: getSourceUnitCost(life.advanced, quotes, sourceMode) / 2,
+    },
+  ];
+  if (life.special) {
+    candidates.push({
+      kind: "special",
+      unitCost: getSourceUnitCost(life.special, quotes, sourceMode) / 10,
+    });
+  }
+  return candidates.reduce((best, candidate) =>
+    candidate.unitCost < best.unitCost ? candidate : best,
+  );
+}
+
+function prepareCommonSources(
   life: LifeDefinition,
   baseAdvanced: number,
   commonNeeded: number,
+  sourceKind: "direct" | "advanced" | "special",
   quotes: QuoteMap,
   sourceMode: SourceMode,
 ): CommonPlan {
-  const maxConversionSets = Math.ceil(commonNeeded / 50);
-  const conversionCandidates = candidateRange(maxConversionSets, 160, 32);
-  let best: CommonPlan | null = null;
-
-  for (const totalConversionSets of conversionCandidates) {
-    const allocationCandidates = life.special
-      ? candidateRange(totalConversionSets, 64, 14)
-      : [totalConversionSets];
-
-    for (const advancedConversionSets of allocationCandidates) {
-      const specialConversionSets = life.special
-        ? totalConversionSets - advancedConversionSets
-        : 0;
-      const directCommon = Math.max(
-        0,
-        commonNeeded - totalConversionSets * 50,
-      );
-      const advancedQuantity =
-        baseAdvanced + advancedConversionSets * 25;
-      const sources = [
-        prepareSource(
-          life.advanced,
-          advancedQuantity,
-          quotes,
-          sourceMode,
-        ),
-        prepareSource(life.common, directCommon, quotes, sourceMode),
-      ];
-      if (life.special) {
-        sources.push(
-          prepareSource(
-            life.special,
-            specialConversionSets * 5,
-            quotes,
-            sourceMode,
-          ),
-        );
-      }
-      const cost = sources.reduce((sum, source) => sum + source.cost, 0);
-
-      if (!best || cost < best.cost) {
-        best = {
-          cost,
-          directCommon,
-          advancedConversionSets,
-          specialConversionSets,
-          sources,
-        };
-      }
-    }
+  const conversionSets =
+    sourceKind === "direct" ? 0 : Math.ceil(commonNeeded / 50);
+  const advancedConversionSets =
+    sourceKind === "advanced" ? conversionSets : 0;
+  const specialConversionSets = sourceKind === "special" ? conversionSets : 0;
+  const directCommon = sourceKind === "direct" ? commonNeeded : 0;
+  const sources = [
+    prepareSource(
+      life.advanced,
+      baseAdvanced + advancedConversionSets * 25,
+      quotes,
+      sourceMode,
+    ),
+    prepareSource(life.common, directCommon, quotes, sourceMode),
+  ];
+  if (life.special) {
+    sources.push(
+      prepareSource(
+        life.special,
+        specialConversionSets * 5,
+        quotes,
+        sourceMode,
+      ),
+    );
   }
+  return {
+    cost: sources.reduce((sum, source) => sum + source.cost, 0),
+    directCommon,
+    advancedConversionSets,
+    specialConversionSets,
+    sources,
+  };
+}
 
-  if (!best) throw new Error(`${life.name} 일반 재료 경로를 계산하지 못했습니다.`);
-  return best;
+function getSourceUnitCost(
+  key: MarketItemKey,
+  quotes: QuoteMap,
+  sourceMode: SourceMode,
+) {
+  const quote = requireQuote(quotes, key);
+  const marketUnitCost = quote.currentMinPrice / quote.bundleCount;
+  return sourceMode === "self" ? marketUnitCost * 0.95 : marketUnitCost;
 }
 
 function prepareSource(
@@ -335,23 +349,6 @@ function mergeSources(sources: PreparedSource[]) {
     current.cost += source.cost;
   }
   return [...merged.values()];
-}
-
-function candidateRange(max: number, exhaustiveLimit: number, edgeSize: number) {
-  if (max <= exhaustiveLimit) {
-    return Array.from({ length: max + 1 }, (_, index) => index);
-  }
-
-  const values = new Set<number>();
-  for (let index = 0; index <= edgeSize; index += 1) {
-    values.add(index);
-    values.add(Math.max(0, max - index));
-  }
-  for (let residue = 0; residue < 20; residue += 1) {
-    values.add(Math.min(max, residue));
-    values.add(Math.max(0, max - residue));
-  }
-  return [...values].sort((a, b) => a - b);
 }
 
 function requireQuote(quotes: QuoteMap, key: MarketItemKey) {

@@ -487,6 +487,7 @@ button:not(:disabled) {
 
 /* Craft profitability workspace */
 .craft-page {
+  --craft-gold: #D97706;
   min-height: 100vh;
   background: #fff;
   color: #172033;
@@ -501,34 +502,19 @@ button:not(:disabled) {
 
 .craft-page-heading {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 12px;
 }
 
 .craft-page-heading h1 {
-  margin: 2px 0 7px;
+  margin: 0;
   color: #101828;
   font-size: clamp(24px, 2.5vw, 32px);
   font-weight: 700;
   letter-spacing: -.035em;
   line-height: 1.25;
-}
-
-.craft-page-heading p {
-  margin: 0;
-  color: #69778c;
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.craft-page-heading .craft-eyebrow {
-  color: #b76a09;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: .08em;
-  text-transform: uppercase;
 }
 
 .craft-refresh-button {
@@ -621,30 +607,15 @@ button:not(:disabled) {
   box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
 }
 
-.craft-product-selector button::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 3px;
-  background: transparent;
-  content: "";
-}
-
 .craft-product-selector button:hover {
   border-color: #bdc9d7;
   background: #fcfdff;
 }
 
 .craft-product-selector button.active {
-  border-color: #d9a441;
-  background:
-    linear-gradient(90deg, rgb(255 248 230 / 78%), #fff 33%);
-  box-shadow: 0 5px 18px rgb(181 116 14 / 9%);
-}
-
-.craft-product-selector button.active::before {
-  background: #d99722;
+  border-color: var(--craft-gold);
+  background: #fff;
+  box-shadow: 0 3px 12px rgb(15 23 42 / 7%);
 }
 
 .craft-product-art {
@@ -652,9 +623,9 @@ button:not(:disabled) {
   width: 52px;
   height: 52px;
   place-items: center;
-  border: 1px solid #e4d5b4;
-  border-radius: 10px;
-  background: #fff9eb;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .craft-product-art img {
@@ -739,7 +710,7 @@ button:not(:disabled) {
   height: 18px;
   margin-top: 2px;
   flex: 0 0 auto;
-  background: #b76a09;
+  background: var(--craft-gold);
   mask: url("/icons/sliders.svg") center / contain no-repeat;
   -webkit-mask: url("/icons/sliders.svg") center / contain no-repeat;
 }
@@ -770,10 +741,10 @@ button:not(:disabled) {
   font-weight: 400;
 }
 
-.craft-number-combo {
+.craft-number-control {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) auto 88px;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   overflow: hidden;
   border: 1px solid #d9e2ed;
@@ -781,13 +752,14 @@ button:not(:disabled) {
   background: #fff;
 }
 
-.craft-number-combo:focus-within {
-  border-color: #c18a31;
-  box-shadow: 0 0 0 3px rgb(193 138 49 / 10%);
+.craft-number-control:focus-within,
+.craft-set-select:focus {
+  border-color: var(--craft-gold);
+  box-shadow: 0 0 0 3px rgb(217 119 6 / 10%);
 }
 
-.craft-number-combo input,
-.craft-number-combo select {
+.craft-number-control input,
+.craft-set-select {
   min-width: 0;
   height: 34px;
   border: 0;
@@ -798,22 +770,24 @@ button:not(:disabled) {
   outline: 0;
 }
 
-.craft-number-combo input {
+.craft-number-control input {
   width: 100%;
   padding: 0 3px 0 10px;
   font-variant-numeric: tabular-nums;
 }
 
-.craft-number-combo > span {
+.craft-number-control > span {
+  padding-right: 10px;
   color: #667085;
   font-size: 11px;
 }
 
-.craft-number-combo select {
-  border-left: 1px solid #e6ebf1;
-  background: #f8fafc;
-  padding: 0 5px;
-  color: #667085;
+.craft-set-select {
+  width: 100%;
+  border: 1px solid #d9e2ed;
+  border-radius: 7px;
+  background: #fff;
+  padding: 0 10px;
 }
 
 .craft-choice-field legend {
@@ -864,7 +838,7 @@ button:not(:disabled) {
 
 .craft-choice-grid button.active .craft-radio-mark {
   border: 3px solid #fff;
-  background: #d99a2e;
+  background: var(--craft-gold);
 }
 
 .craft-settings-note {
@@ -956,7 +930,7 @@ button:not(:disabled) {
   border: 1px solid #e1e7ef;
   border-radius: 7px;
   background: #fff;
-  color: #9a670b;
+  color: var(--craft-gold);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   letter-spacing: .05em;
@@ -990,7 +964,7 @@ button:not(:disabled) {
 }
 
 .craft-profit {
-  color: #c87508;
+  color: var(--craft-gold);
   font-size: 14px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
@@ -998,7 +972,7 @@ button:not(:disabled) {
 }
 
 .craft-profit.negative {
-  color: #dc4b4b;
+  color: var(--craft-gold);
 }
 
 .craft-accordion-chevron {
@@ -1112,15 +1086,15 @@ button:not(:disabled) {
   white-space: nowrap;
 }
 
-.craft-cost { color: #e05252; }
-.craft-positive { color: #13966f; }
+.craft-cost,
+.craft-positive { color: var(--craft-gold); }
 
 .craft-net-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 15px 0 0 88px;
+  padding: 15px 0 0;
   color: #344054;
   font-size: 12px;
   font-weight: 650;
@@ -1131,16 +1105,8 @@ button:not(:disabled) {
 }
 
 .craft-method-panel {
-  border-left: 1px solid #e2e8f0;
-  background:
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 31px,
-      rgb(226 232 240 / 38%) 31px,
-      rgb(226 232 240 / 38%) 32px
-    ),
-    #fbfcfe;
+  border-left: 0;
+  background: #f8fafc;
   padding: 20px;
 }
 
@@ -1156,7 +1122,7 @@ button:not(:disabled) {
   height: 17px;
   margin-top: 1px;
   flex: 0 0 auto;
-  background: #9a670b;
+  background: var(--craft-gold);
   mask: url("/icons/arrow-left-right.svg") center / contain no-repeat;
   -webkit-mask: url("/icons/arrow-left-right.svg") center / contain no-repeat;
 }
@@ -1214,7 +1180,7 @@ button:not(:disabled) {
 }
 
 .craft-method-panel li b {
-  color: #9a670b;
+  color: var(--craft-gold);
   font-weight: 650;
 }
 
@@ -1265,9 +1231,8 @@ button:not(:disabled) {
 .craft-skeleton > div,
 .craft-skeleton-grid span {
   border-radius: 10px;
-  background: linear-gradient(90deg, #f1f5f9, #fafbfd, #f1f5f9);
-  background-size: 200% 100%;
-  animation: craft-shimmer 1.25s ease-in-out infinite;
+  background: #f1f5f9;
+  animation: craft-pulse 1.25s ease-in-out infinite alternate;
 }
 
 .craft-skeleton > div { height: 94px; }
@@ -1281,8 +1246,8 @@ button:not(:disabled) {
 .craft-skeleton-grid span:last-child { grid-column: 2; }
 .craft-skeleton-grid span:nth-child(2) { display: none; }
 
-@keyframes craft-shimmer {
-  to { background-position: -200% 0; }
+@keyframes craft-pulse {
+  to { opacity: .55; }
 }
 
 @media (max-width: 900px) {
@@ -1306,7 +1271,7 @@ button:not(:disabled) {
   }
 
   .craft-method-panel {
-    border-top: 1px solid #e2e8f0;
+    border-top: 0;
     border-left: 0;
   }
 }
@@ -1323,10 +1288,6 @@ button:not(:disabled) {
   .craft-page-heading h1 {
     max-width: 270px;
     font-size: 23px;
-  }
-
-  .craft-page-heading > div > p:not(.craft-eyebrow) {
-    max-width: 280px;
   }
 
   .craft-refresh-button {

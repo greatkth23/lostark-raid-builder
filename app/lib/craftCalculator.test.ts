@@ -45,6 +45,21 @@ describe("craft calculator", () => {
     expect(results[0].revenue).toBe(39_900);
   });
 
+  it("applies the entered great-success increase multiplicatively to the base 5%", () => {
+    const results = calculateCraftResults(
+      "abidos",
+      {
+        ...DEFAULT_CRAFT_SETTINGS,
+        setCount: 40,
+        extraGreatSuccessPct: 10,
+      },
+      makeQuotes({ abidosFusion: { currentMinPrice: 100 } }),
+    );
+
+    expect(results[0].expectedOutput).toBeCloseTo(422);
+    expect(results[0].revenue).toBeCloseTo(40_090);
+  });
+
   it("rounds the discounted crafting fee down per set", () => {
     const results = calculateCraftResults(
       "abidos",
@@ -136,6 +151,30 @@ describe("craft calculator", () => {
     expect(
       result?.exchangeSteps.some((step) => step.label.includes("튼튼한 목재")),
     ).toBe(true);
+  });
+
+  it("prefers the cheapest equivalent route even when bundle rounding leaves more material", () => {
+    const quotes = makeQuotes({
+      loggingRare: { bundleCount: 100, currentMinPrice: 1_695 },
+      loggingAdvanced: { bundleCount: 100, currentMinPrice: 267 },
+      loggingCommon: { bundleCount: 100, currentMinPrice: 137 },
+      loggingSpecial: { bundleCount: 100, currentMinPrice: 100_000 },
+    });
+    const result = calculateCraftResults(
+      "advancedAbidos",
+      { ...DEFAULT_CRAFT_SETTINGS, setCount: 30 },
+      quotes,
+    ).find((item) => item.lifeKey === "logging");
+
+    expect(
+      result?.acquisitionLines.some((line) => line.key === "loggingRare"),
+    ).toBe(false);
+    expect(
+      result?.exchangeSteps.some(
+        (step) => step.label === "부드러운 목재 → 목재",
+      ),
+    ).toBe(true);
+    expect(result?.exchangeSteps.some((step) => step.label.includes("벌목의 가루"))).toBe(true);
   });
 
   it("clamps persisted settings to supported ranges", () => {

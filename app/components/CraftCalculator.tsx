@@ -139,13 +139,7 @@ export default function CraftCalculator() {
     <main className="craft-page">
       <div className="craft-shell">
         <header className="craft-page-heading">
-          <div>
-            <p className="craft-eyebrow">생활 제작 수익 분석</p>
-            <h1>아비도스 융화 재료 제작 계산기</h1>
-            <p>
-              거래소 시세와 재료 교환을 함께 비교해 가장 이득인 제작 경로를 찾습니다.
-            </p>
-          </div>
+          <h1>영지 제작 계산기</h1>
           <button
             className="craft-refresh-button"
             type="button"
@@ -224,38 +218,31 @@ export default function CraftCalculator() {
                   </div>
                 </div>
 
-                <NumberPresetField
-                  label="제작비 감소"
+                <DirectNumberField
+                  label="수수료 감소"
                   value={settings.feeReductionPct}
                   suffix="%"
                   min={0}
                   max={100}
                   step={1}
-                  presets={[0, 5, 10, 14, 20]}
                   onChange={(value) => updateSettings("feeReductionPct", value)}
                 />
-                <NumberPresetField
-                  label="추가 대성공 확률"
-                  description={`기본 5% 포함 · 총 ${Math.min(100, 5 + settings.extraGreatSuccessPct)}%`}
+                <DirectNumberField
+                  label="대성공 확률 증가"
+                  description={`기본 5% · 적용 ${formatPercentage(Math.min(100, 5 * (1 + settings.extraGreatSuccessPct / 100)))}%`}
                   value={settings.extraGreatSuccessPct}
                   suffix="%"
                   min={0}
-                  max={95}
+                  max={1_900}
                   step={1}
-                  presets={[0, 3, 5, 7, 10]}
                   onChange={(value) =>
                     updateSettings("extraGreatSuccessPct", value)
                   }
                 />
-                <NumberPresetField
+                <SetCountField
                   label="제작 세트"
                   description={`기본 생산 ${formatNumber(settings.setCount * 10)}개`}
                   value={settings.setCount}
-                  suffix="세트"
-                  min={1}
-                  max={1_000}
-                  step={1}
-                  presets={[10, 20, 30, 40]}
                   onChange={(value) => updateSettings("setCount", value)}
                 />
 
@@ -460,7 +447,7 @@ function CraftResultAccordion({
   );
 }
 
-function NumberPresetField({
+function DirectNumberField({
   label,
   description,
   value,
@@ -468,7 +455,6 @@ function NumberPresetField({
   min,
   max,
   step,
-  presets,
   onChange,
 }: {
   label: string;
@@ -478,12 +464,23 @@ function NumberPresetField({
   min: number;
   max: number;
   step: number;
-  presets: number[];
   onChange: (value: number) => void;
 }) {
-  const presetValue = presets.includes(value) ? String(value) : "custom";
+  const inputRef = useRef<HTMLInputElement>(null);
   const commit = (next: number) =>
     onChange(Math.min(max, Math.max(min, Number.isFinite(next) ? next : value)));
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      commit(value + (event.deltaY < 0 ? step : -step));
+    };
+    input.addEventListener("wheel", handleWheel, { passive: false });
+    return () => input.removeEventListener("wheel", handleWheel);
+  });
 
   return (
     <label className="craft-setting-field">
@@ -491,35 +488,74 @@ function NumberPresetField({
         <span>{label}</span>
         {description ? <small>{description}</small> : null}
       </span>
-      <div className="craft-number-combo">
+      <div className="craft-number-control">
         <input
+          ref={inputRef}
           type="number"
           value={value}
           min={min}
           max={max}
           step={step}
           onChange={(event) => commit(Number(event.target.value))}
-          onWheel={(event) => {
-            event.preventDefault();
-            commit(value + (event.deltaY < 0 ? step : -step));
-          }}
         />
         <span>{suffix}</span>
-        <select
-          value={presetValue}
-          aria-label={`${label} 빠른 선택`}
-          onChange={(event) => {
-            if (event.target.value !== "custom") commit(Number(event.target.value));
-          }}
-        >
-          {presets.map((preset) => (
-            <option value={preset} key={preset}>
-              {preset}{suffix}
-            </option>
-          ))}
-          <option value="custom">직접 입력</option>
-        </select>
       </div>
+    </label>
+  );
+}
+
+function SetCountField({
+  label,
+  description,
+  value,
+  onChange,
+}: {
+  label: string;
+  description?: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const selectRef = useRef<HTMLSelectElement>(null);
+  const presets = [10, 20, 30, 40];
+  const options = presets.includes(value)
+    ? presets
+    : [...presets, value].sort((a, b) => a - b);
+
+  useEffect(() => {
+    const select = selectRef.current;
+    if (!select) return;
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const currentIndex = options.indexOf(value);
+      const nextIndex = Math.min(
+        options.length - 1,
+        Math.max(0, currentIndex + (event.deltaY > 0 ? 1 : -1)),
+      );
+      onChange(options[nextIndex]);
+    };
+    select.addEventListener("wheel", handleWheel, { passive: false });
+    return () => select.removeEventListener("wheel", handleWheel);
+  });
+
+  return (
+    <label className="craft-setting-field">
+      <span className="craft-setting-label">
+        <span>{label}</span>
+        {description ? <small>{description}</small> : null}
+      </span>
+      <select
+        ref={selectRef}
+        className="craft-set-select"
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      >
+        {options.map((option) => (
+          <option value={option} key={option}>
+            {option}세트
+          </option>
+        ))}
+      </select>
     </label>
   );
 }
@@ -588,6 +624,9 @@ const formatNumber = (value: number) =>
 
 const formatQuantity = (value: number) =>
   new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 }).format(value);
+
+const formatPercentage = (value: number) =>
+  new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 2 }).format(value);
 
 const formatGold = (value: number) => `${formatNumber(Math.round(value))}G`;
 
