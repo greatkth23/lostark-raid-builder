@@ -918,7 +918,7 @@ button:not(:disabled) {
   gap: 8px;
   border: 0;
   background: #fff;
-  padding: 12px 10px;
+  padding: 12px 20px;
   text-align: left;
 }
 
@@ -938,7 +938,7 @@ button:not(:disabled) {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #101828;
+  color: var(--craft-gold);
   font-size: 28px;
   font-weight: 700;
   line-height: 1;
