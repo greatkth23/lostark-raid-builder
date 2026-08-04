@@ -980,6 +980,10 @@ button:not(:disabled) {
   white-space: nowrap;
 }
 
+.craft-profit.positive {
+  color: #E88B00;
+}
+
 .craft-profit.negative {
   color: var(--craft-gold);
 }
