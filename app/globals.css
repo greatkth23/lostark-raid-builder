@@ -912,8 +912,8 @@ button:not(:disabled) {
   display: grid;
   width: 100%;
   min-width: 0;
-  min-height: 74px;
-  grid-template-columns: 36px minmax(0, 1fr) auto 16px;
+  min-height: 96px;
+  grid-template-columns: 72px minmax(0, 1fr) auto 16px;
   align-items: center;
   gap: 12px;
   border: 0;
@@ -932,17 +932,19 @@ button:not(:disabled) {
 }
 
 .craft-rank {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border: 1px solid #e1e7ef;
-  border-radius: 7px;
-  background: #fff;
+  display: block;
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: #101828;
-  font-size: var(--craft-font-xs);
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
-  letter-spacing: .05em;
+  letter-spacing: -.04em;
+  text-align: center;
 }
 
 .craft-life-title,
@@ -1349,15 +1351,14 @@ button:not(:disabled) {
   }
 
   .craft-result-summary {
-    min-height: 78px;
-    grid-template-columns: 30px minmax(0, 1fr) 14px;
+    min-height: 86px;
+    grid-template-columns: 52px minmax(0, 1fr) 14px;
     gap: 9px;
     padding: 11px 12px;
   }
 
   .craft-rank {
-    width: 28px;
-    height: 28px;
+    font-size: 36px;
   }
 
   .craft-summary-profit {
