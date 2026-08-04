@@ -304,7 +304,7 @@ export default function CraftCalculator() {
                   <span>계산 기준</span>
                   {settings.sourceMode === "market"
                     ? "구매 묶음은 필요한 수량 이상으로 올림합니다."
-                    : "거래소 묶음 가격을 개당 단가로 환산해 1개까지 기회비용에 반영합니다."}
+                    : "거래소 묶음 가격을 개당 단가로 환산해 기회비용에 반영합니다."}
                 </div>
               </aside>
 
