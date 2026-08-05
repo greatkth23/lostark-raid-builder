@@ -614,14 +614,31 @@ export default function Home() {
     }
     if (
       result.raidChanged &&
-      !window.confirm("다른 난이도로 이동하면 멤버 목록의 레이드 선택도 함께 변경됩니다. 이동할까요?")
+      !window.confirm(
+        result.swappedMemberId
+          ? "다른 난이도 사이에서 맞교환하면 두 캐릭터의 레이드 선택도 함께 변경됩니다. 맞교환할까요?"
+          : "다른 난이도로 이동하면 멤버 목록의 레이드 선택도 함께 변경됩니다. 이동할까요?",
+      )
     ) return;
-    const location = locateCharacter(players, memberId);
-    const raidChanges = result.raidChanged && location && target
-      ? [{ ...location, raidName: target.raidName, checked: true }]
-      : [];
+    const movedLocation = locateCharacter(players, memberId);
+    const swappedLocation = result.swappedMemberId
+      ? locateCharacter(players, result.swappedMemberId)
+      : null;
+    const raidChanges: NonNullable<Extract<RaidGroupOperation, { type: "party.layout.set" }>["raidChanges"]> = [];
+    if (result.raidChanged && movedLocation && target) {
+      raidChanges.push({ ...movedLocation, raidName: target.raidName, checked: true });
+    }
+    if (result.raidChanged && swappedLocation && source) {
+      raidChanges.push({ ...swappedLocation, raidName: source.raidName, checked: true });
+    }
     commitPartyPlan(result.plan, raidChanges);
-    setNotice(source && target ? `${source.raidName}에서 ${target.raidName} 파티로 이동했습니다.` : "파티를 이동했습니다.");
+    setNotice(
+      result.swappedMemberId
+        ? "같은 플레이어의 두 캐릭터를 맞교환했습니다."
+        : source && target
+          ? `${source.raidName}에서 ${target.raidName} 파티로 이동했습니다.`
+          : "파티를 이동했습니다.",
+    );
   };
 
   const swapPlanMember = (memberId: string, groupId: string, candidateId: string) => {

@@ -210,7 +210,7 @@ export default function PartyPanel({
         />
       </div>
 
-      <p className="party-help">캐릭터를 드래그해서 같은 레이드의 다른 파티 빈자리로 옮기거나, 교환 버튼으로 같은 플레이어의 다른 캐릭터와 바꿀 수 있어요.</p>
+      <p className="party-help">캐릭터를 드래그해 같은 레이드 계열의 다른 파티로 옮길 수 있어요. 대상 파티에 같은 플레이어의 캐릭터가 있으면 두 캐릭터를 맞교환합니다.</p>
       {stale ? <div className="party-warning">멤버 정보가 변경되었습니다. 자동구성하면 현재 수동 배치를 유지하며 다시 충원합니다.</div> : null}
       {plan?.warnings.length ? (
         <div className="party-warning">{plan.warnings.join(" ")}</div>

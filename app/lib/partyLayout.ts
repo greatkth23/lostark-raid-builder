@@ -2,7 +2,12 @@ import { getRaidDefinition, type CharacterInput, type RaidGroup, type RaidPlanRe
 import type { ManualPartyLayout } from "./partyTypes";
 
 export type PartyPlacementResult =
-  | { ok: true; plan: RaidPlanResult; raidChanged: boolean }
+  | {
+      ok: true;
+      plan: RaidPlanResult;
+      raidChanged: boolean;
+      swappedMemberId?: string;
+    }
   | { ok: false; reason: string };
 
 const classKey = (value: string) => value.trim().replace(/\s+/g, "").toLowerCase();
@@ -87,6 +92,21 @@ export const movePartyMember = (
   const targetRaid = getRaidDefinition(target.raidName);
   if (!sourceRaid || !targetRaid || sourceRaid.family !== targetRaid.family) {
     return { ok: false, reason: "같은 레이드 계열의 파티 사이에서만 이동할 수 있습니다." };
+  }
+  const samePlayerMember = target.members.find(
+    (candidate) => candidate.playerId === member.playerId,
+  );
+  if (samePlayerMember) {
+    const result = swapPartyMember(
+      plan,
+      memberId,
+      sourceGroupId,
+      samePlayerMember,
+      targetGroupId,
+    );
+    return result.ok
+      ? { ...result, swappedMemberId: samePlayerMember.id }
+      : result;
   }
   const targetMembers = [...target.members, member];
   const reason = validateMembers(target, targetMembers);
