@@ -553,10 +553,8 @@ function SetCountField({
   onChange: (value: number) => void;
 }) {
   const selectRef = useRef<HTMLSelectElement>(null);
-  const presets = [10, 20, 30, 40];
-  const options = presets.includes(value)
-    ? presets
-    : [...presets, value].sort((a, b) => a - b);
+  const presets = [40, 30, 20, 10];
+  const [customMode, setCustomMode] = useState(() => !presets.includes(value));
 
   useEffect(() => {
     const select = selectRef.current;
@@ -564,12 +562,20 @@ function SetCountField({
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
       event.stopPropagation();
-      const currentIndex = options.indexOf(value);
+      const closestIndex = presets.reduce(
+        (closest, preset, index) =>
+          Math.abs(preset - value) < Math.abs(presets[closest] - value)
+            ? index
+            : closest,
+        0,
+      );
+      const currentIndex = presets.includes(value) ? presets.indexOf(value) : closestIndex;
       const nextIndex = Math.min(
-        options.length - 1,
+        presets.length - 1,
         Math.max(0, currentIndex + (event.deltaY > 0 ? 1 : -1)),
       );
-      onChange(options[nextIndex]);
+      setCustomMode(false);
+      onChange(presets[nextIndex]);
     };
     select.addEventListener("wheel", handleWheel, { passive: false });
     return () => select.removeEventListener("wheel", handleWheel);
@@ -584,15 +590,43 @@ function SetCountField({
       <select
         ref={selectRef}
         className="craft-set-select"
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
+        value={customMode ? "custom" : String(value)}
+        aria-label={`${label} 선택`}
+        onChange={(event) => {
+          if (event.target.value === "custom") {
+            setCustomMode(true);
+            return;
+          }
+          setCustomMode(false);
+          onChange(Number(event.target.value));
+        }}
       >
-        {options.map((option) => (
+        {presets.map((option) => (
           <option value={option} key={option}>
             {option}세트
           </option>
         ))}
+        <option value="custom">직접 입력</option>
       </select>
+      {customMode ? (
+        <div className="craft-set-custom-control">
+          <input
+            type="number"
+            value={value}
+            min={1}
+            max={1_000}
+            step={1}
+            aria-label="제작 세트 직접 입력"
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              if (Number.isFinite(next)) {
+                onChange(Math.min(1_000, Math.max(1, Math.round(next))));
+              }
+            }}
+          />
+          <span>세트</span>
+        </div>
+      ) : null}
     </label>
   );
 }

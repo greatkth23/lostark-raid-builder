@@ -795,6 +795,40 @@ button:not(:disabled) {
   padding: 0 10px;
 }
 
+.craft-set-custom-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #d9e2ed;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.craft-set-custom-control:focus-within {
+  border-color: var(--craft-gold);
+  box-shadow: 0 0 0 3px rgb(217 119 6 / 10%);
+}
+
+.craft-set-custom-control input {
+  width: 100%;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  padding: 0 3px 0 10px;
+  color: #182230;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  outline: 0;
+}
+
+.craft-set-custom-control span {
+  padding-right: 10px;
+  color: #667085;
+  font-size: 11px;
+}
+
 .craft-choice-field legend {
   margin-bottom: 8px;
   color: #344054;
