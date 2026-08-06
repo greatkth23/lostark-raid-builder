@@ -60,14 +60,41 @@ describe("craft calculator", () => {
     expect(results[0].revenue).toBeCloseTo(40_090);
   });
 
-  it("rounds the discounted crafting fee down per set", () => {
+  it("uses the correct base crafting fee for each fusion material", () => {
+    const settings = {
+      ...DEFAULT_CRAFT_SETTINGS,
+      setCount: 2,
+      feeReductionPct: 0,
+    };
+    const abidos = calculateCraftResults("abidos", settings, makeQuotes());
+    const advanced = calculateCraftResults(
+      "advancedAbidos",
+      settings,
+      makeQuotes(),
+    );
+
+    expect(abidos[0].craftFee).toBe(400 * 2);
+    expect(advanced[0].craftFee).toBe(520 * 2);
+  });
+
+  it("rounds the discounted crafting fee per set before multiplying", () => {
+    const results = calculateCraftResults(
+      "advancedAbidos",
+      { ...DEFAULT_CRAFT_SETTINGS, setCount: 3, feeReductionPct: 12 },
+      makeQuotes(),
+    );
+
+    expect(results[0].craftFee).toBe(458 * 3);
+  });
+
+  it("applies the default fee reduction to the normal fusion material", () => {
     const results = calculateCraftResults(
       "abidos",
       { ...DEFAULT_CRAFT_SETTINGS, setCount: 30, feeReductionPct: 14 },
       makeQuotes(),
     );
 
-    expect(results[0].craftFee).toBe(295 * 30);
+    expect(results[0].craftFee).toBe(344 * 30);
   });
 
   it("uses only fixed 100-to-80 and 100-to-10 powder exchange sets", () => {

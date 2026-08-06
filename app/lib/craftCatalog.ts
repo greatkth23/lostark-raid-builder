@@ -110,7 +110,7 @@ export const FUSION_RECIPES: Record<
     rare: 33,
     advanced: 45,
     common: 86,
-    fee: 344,
+    fee: 400,
     output: 10,
   },
   advancedAbidos: {
@@ -119,7 +119,7 @@ export const FUSION_RECIPES: Record<
     rare: 43,
     advanced: 59,
     common: 112,
-    fee: 447,
+    fee: 520,
     output: 10,
   },
 };

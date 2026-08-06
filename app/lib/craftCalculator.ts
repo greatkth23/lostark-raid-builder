@@ -78,7 +78,7 @@ export function calculateCraftResults(
     expectedOutput *
     productUnitPrice *
     (settings.disposition === "sell" ? 0.95 : 1);
-  const discountedFeePerSet = Math.floor(
+  const discountedFeePerSet = Math.round(
     recipe.fee * (1 - settings.feeReductionPct / 100),
   );
   const craftFee = discountedFeePerSet * settings.setCount;
