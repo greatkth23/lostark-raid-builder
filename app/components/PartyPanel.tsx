@@ -14,13 +14,13 @@ import {
 } from "../lib/partyLayout";
 import type { Player } from "../lib/raidData";
 
-type ViewMode = "raid" | "member";
 type NameMode = "character" | "nickname";
 type SwapState = { group: RaidGroup; member: AssignedMember } | null;
 type AddState = { group: RaidGroup; role: AssignedMember["role"] } | null;
 
 const PREFERENCE_KEY = "loiar-party-view-preferences-v1";
 const PARTY_EXIT_DURATION_MS = 520;
+const ALL_RAID_FAMILIES = "__all__";
 const GOLD_ICON_URL = typeof lostarkGoldIcon === "string" ? lostarkGoldIcon : lostarkGoldIcon.src;
 
 type PartyPanelProps = {
@@ -82,10 +82,9 @@ export default function PartyPanel({
   onSwap,
   onToggleComplete,
 }: PartyPanelProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("member");
   const [nameMode, setNameMode] = useState<NameMode>("character");
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
-  const [selectedRaidFamily, setSelectedRaidFamily] = useState("");
+  const [selectedRaidFamily, setSelectedRaidFamily] = useState(ALL_RAID_FAMILIES);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(
     new Set(),
   );
@@ -156,16 +155,23 @@ export default function PartyPanel({
     return result;
   }, [visibleGroups]);
   const raidFamilyTabs = useMemo(
-    () => Array.from(groupsByFamily.entries()).map(([family, familyGroups], index) => ({
-      family,
-      groups: familyGroups,
-      tabId: `party-raid-family-tab-${index}`,
-    })),
+    () => [
+      {
+        family: ALL_RAID_FAMILIES,
+        label: "전체",
+        tabId: "party-raid-family-tab-all",
+      },
+      ...Array.from(groupsByFamily.keys()).map((family, index) => ({
+        family,
+        label: family,
+        tabId: `party-raid-family-tab-${index}`,
+      })),
+    ],
     [groupsByFamily],
   );
-  const activeRaidFamily = groupsByFamily.has(selectedRaidFamily)
+  const activeRaidFamily = selectedRaidFamily === ALL_RAID_FAMILIES || groupsByFamily.has(selectedRaidFamily)
     ? selectedRaidFamily
-    : raidFamilyTabs[0]?.family ?? "";
+    : ALL_RAID_FAMILIES;
 
   const sortedPlayers = useMemo(() => [...players].sort((a, b) => {
     if (a.id === favoritePlayerId) return -1;
@@ -185,17 +191,16 @@ export default function PartyPanel({
   const displayedGroups = useMemo(() => {
     const selectedGroups = selectGroupsForPartyView(
       visibleGroups,
-      viewMode === "raid"
-        ? { mode: "raid", raidFamily: activeRaidFamily }
-        : { mode: "member", selectedPlayerIds: activeSelectedPlayerIds },
+      {
+        selectedPlayerIds: activeSelectedPlayerIds,
+        raidFamily: activeRaidFamily === ALL_RAID_FAMILIES
+          ? undefined
+          : activeRaidFamily,
+      },
     );
-    return viewMode === "member"
-      ? sortGroupsForMemberMasonry(selectedGroups, groups)
-      : selectedGroups;
-  }, [activeRaidFamily, activeSelectedPlayerIds, groups, viewMode, visibleGroups]);
-  const resultPanelKey = viewMode === "raid"
-    ? `raid:${activeRaidFamily}`
-    : `member:${Array.from(activeSelectedPlayerIds).sort().join(",")}`;
+    return sortGroupsForMemberMasonry(selectedGroups, groups);
+  }, [activeRaidFamily, activeSelectedPlayerIds, groups, visibleGroups]);
+  const resultPanelKey = `${activeRaidFamily}:${Array.from(activeSelectedPlayerIds).sort().join(",")}`;
   const selectedPlayerNames = useMemo(
     () => sortedPlayers
       .filter((player) => activeSelectedPlayerIds.has(player.id))
@@ -245,34 +250,24 @@ export default function PartyPanel({
           <h2>파티 목록</h2>
           <p>이번 주 레이드 현황 · {formatRaidWeekRange(raidWeek)}</p>
         </div>
-        <button className="party-update-button" type="button" onClick={onUpdate} disabled={updating}>
-          <PartyIcon name="reload" className="party-refresh-icon" />
-          {updating ? "구성 중" : "자동구성"}
-        </button>
+        <div className="party-panel-actions">
+          <SegmentedControl
+            className="party-name-control"
+            value={nameMode}
+            items={[
+              { value: "character", label: "캐릭터명", icon: "tag" },
+              { value: "nickname", label: "닉네임", icon: "user03" },
+            ]}
+            onChange={(value) => setNameMode(value as NameMode)}
+          />
+          <button className="party-update-button" type="button" onClick={onUpdate} disabled={updating}>
+            <PartyIcon name="reload" className="party-refresh-icon" />
+            {updating ? "구성 중" : "자동구성"}
+          </button>
+        </div>
       </div>
 
-      <div className="party-filter-row">
-        <SegmentedControl
-          className="party-view-control"
-          value={viewMode}
-          items={[
-            { value: "member", label: "멤버별" },
-            { value: "raid", label: "레이드별" },
-          ]}
-          onChange={(value) => setViewMode(value as ViewMode)}
-        />
-        <SegmentedControl
-          className="party-name-control"
-          value={nameMode}
-          items={[
-            { value: "character", label: "캐릭터명", icon: "tag" },
-            { value: "nickname", label: "닉네임", icon: "user03" },
-          ]}
-          onChange={(value) => setNameMode(value as NameMode)}
-        />
-      </div>
-
-      {viewMode === "member" && plan ? (
+      {plan ? (
         <MemberFilterBar
           players={sortedPlayers}
           selectedPlayerIds={activeSelectedPlayerIds}
@@ -282,7 +277,7 @@ export default function PartyPanel({
         />
       ) : null}
 
-      {viewMode === "raid" && raidFamilyTabs.length ? (
+      {plan && visibleGroups.length ? (
         <RaidFamilyTabs
           items={raidFamilyTabs}
           value={activeRaidFamily}
@@ -305,17 +300,15 @@ export default function PartyPanel({
         <section
           key={resultPanelKey}
           className="party-results-section"
-          role={viewMode === "raid" ? "tabpanel" : undefined}
-          id={viewMode === "raid" ? "party-raid-family-panel" : undefined}
-          aria-labelledby={viewMode === "raid"
-            ? raidFamilyTabs.find((item) => item.family === activeRaidFamily)?.tabId
-            : undefined}
-          aria-live={viewMode === "member" ? "polite" : undefined}
+          role="tabpanel"
+          id="party-raid-family-panel"
+          aria-labelledby={raidFamilyTabs.find((item) => item.family === activeRaidFamily)?.tabId}
+          aria-live="polite"
         >
           <PartyGroupGrid
             groups={displayedGroups}
             allGroups={groups}
-            masonry={viewMode === "member"}
+            masonry
             completedPartyIds={completedPartyIds}
             departingPartyIds={departingPartyIds}
             displayName={displayName}
@@ -333,8 +326,8 @@ export default function PartyPanel({
         </section>
       ) : (
         <div className="party-empty party-filter-empty" aria-live="polite">
-          <strong>{viewMode === "raid" ? "선택한 레이드의 파티가 없습니다." : "선택한 멤버 조건의 파티가 없습니다."}</strong>
-          <span>{viewMode === "raid" ? "다른 레이드 탭을 선택해 주세요." : "멤버 선택을 바꾸거나 모두 해제해 전체 파티를 확인해 주세요."}</span>
+          <strong>선택한 조건의 파티가 없습니다.</strong>
+          <span>멤버 조합을 바꾸거나 다른 레이드 탭을 선택해 주세요.</span>
         </div>
       )}
 
@@ -426,7 +419,7 @@ function MemberFilterBar({ players, selectedPlayerIds, selectedPlayerNames, resu
 }
 
 function RaidFamilyTabs({ items, value, onChange }: {
-  items: Array<{ family: string; tabId: string }>;
+  items: Array<{ family: string; label: string; tabId: string }>;
   value: string;
   onChange: (family: string) => void;
 }) {
@@ -468,7 +461,7 @@ function RaidFamilyTabs({ items, value, onChange }: {
               }
             }}
           >
-            {item.family}
+            {item.label}
           </button>
         );
       })}

@@ -46,10 +46,9 @@
   font-size: 13px;
 }
 
-.party-filter-row {
+.party-panel-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
 }
 
@@ -208,7 +207,7 @@
 
 .party-raid-tabs {
   display: flex;
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
   align-self: flex-start;
@@ -477,8 +476,8 @@
   .party-title-block { min-width: 0; }
   .party-panel-heading h2 { font-size: 22px; }
   .party-panel-heading p { white-space: nowrap; font-size: 12px; }
+  .party-panel-actions { flex: none; }
   .party-update-button { flex: none; }
-  .party-filter-row { width: 100%; }
   .party-member-filter { padding: 11px 12px; }
   .party-filter-meta { align-items: flex-start; flex-direction: column; gap: 2px; }
   .party-filter-meta span { width: 100%; }

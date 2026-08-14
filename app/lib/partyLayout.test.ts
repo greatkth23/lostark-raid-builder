@@ -199,16 +199,15 @@ describe("멤버 조합 파티 필터", () => {
     expect(result.map((group) => group.id)).toEqual(["duplicate"]);
   });
 
-  it("멤버별 보기에서는 복수 선택과 정확히 같은 파티만 렌더링한다", () => {
+  it("멤버 조합을 선택하면 정확히 같은 파티만 렌더링한다", () => {
     const result = selectGroupsForPartyView(groups, {
-      mode: "member",
       selectedPlayerIds: new Set(["alpha", "beta"]),
     });
 
     expect(result.map((group) => group.id)).toEqual(["pair"]);
   });
 
-  it("레이드별 보기에서는 선택한 계열의 난이도 파티만 렌더링한다", () => {
+  it("레이드 계열을 선택하면 해당 계열의 난이도 파티만 렌더링한다", () => {
     const normal = createGroup("guardian-normal", "벨가르딘 노말", [
       createMember({ id: "beta-normal", playerId: "beta" }),
     ]);
@@ -218,7 +217,7 @@ describe("멤버 조합 파티 필터", () => {
 
     const result = selectGroupsForPartyView(
       [normal, single, hard, pair, trio],
-      { mode: "raid", raidFamily: "벨가르딘" },
+      { selectedPlayerIds: new Set(), raidFamily: "벨가르딘" },
     );
 
     expect(result.map((group) => group.id)).toEqual([
@@ -226,9 +225,29 @@ describe("멤버 조합 파티 필터", () => {
       "guardian-hard",
     ]);
   });
+
+  it("멤버 조합과 레이드 계열 조건을 함께 적용한다", () => {
+    const normal = createGroup("guardian-normal", "벨가르딘 노말", [
+      createMember({ id: "alpha-normal", playerId: "alpha" }),
+      createMember({ id: "beta-normal", playerId: "beta" }),
+    ]);
+    const hard = createGroup("guardian-hard", "벨가르딘 하드", [
+      createMember({ id: "alpha-hard", playerId: "alpha" }),
+    ]);
+
+    const result = selectGroupsForPartyView(
+      [normal, hard, pair],
+      {
+        selectedPlayerIds: new Set(["alpha", "beta"]),
+        raidFamily: "벨가르딘",
+      },
+    );
+
+    expect(result.map((group) => group.id)).toEqual(["guardian-normal"]);
+  });
 });
 
-describe("멤버별 Masonry 파티 정렬", () => {
+describe("통합 파티 Masonry 정렬", () => {
   const createMembers = (count: number, prefix: string) =>
     Array.from({ length: count }, (_, index) => createMember({
       id: `${prefix}-${index + 1}`,

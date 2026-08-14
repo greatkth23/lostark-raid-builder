@@ -100,12 +100,19 @@ export const filterGroupsByRaidFamily = (
 
 export const selectGroupsForPartyView = (
   groups: RaidGroup[],
-  selection:
-    | { mode: "member"; selectedPlayerIds: ReadonlySet<string> }
-    | { mode: "raid"; raidFamily: string },
-) => selection.mode === "member"
-  ? filterGroupsBySelectedPlayerIds(groups, selection.selectedPlayerIds)
-  : filterGroupsByRaidFamily(groups, selection.raidFamily);
+  selection: {
+    selectedPlayerIds: ReadonlySet<string>;
+    raidFamily?: string;
+  },
+) => {
+  const memberGroups = filterGroupsBySelectedPlayerIds(
+    groups,
+    selection.selectedPlayerIds,
+  );
+  return selection.raidFamily
+    ? filterGroupsByRaidFamily(memberGroups, selection.raidFamily)
+    : memberGroups;
+};
 
 export const sortGroupsForMemberMasonry = (
   groups: RaidGroup[],
