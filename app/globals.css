@@ -258,6 +258,14 @@
   background: #101827;
 }
 
+.party-raid-tabs button:first-child {
+  padding-left: 0;
+}
+
+.party-raid-tabs button:first-child::after {
+  left: 0;
+}
+
 .party-card-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4580,4 +4588,265 @@ button:not(:disabled) {
 
 .player-card.collapsed .player-card-head {
   border-bottom: 0;
+}
+
+/* Member player tabs and unboxed active-player workspace */
+.member-player-tabs {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.member-player-tab {
+  position: relative;
+  min-width: max-content;
+  min-height: 38px;
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  padding: 0 10px 3px;
+  color: #64748b;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.member-player-tab::after {
+  position: absolute;
+  right: 8px;
+  bottom: 0;
+  left: 8px;
+  height: 2px;
+  background: transparent;
+  content: "";
+}
+
+.member-player-tab:hover {
+  color: #111827;
+}
+
+.member-player-tab.active {
+  color: #111827;
+  font-weight: 700;
+}
+
+.member-player-tab.active::after {
+  background: #101827;
+}
+
+.member-player-tab:first-child {
+  padding-left: 0;
+}
+
+.member-player-tab:first-child::after {
+  left: 0;
+}
+
+.member-player-tab:focus-visible {
+  outline: 2px solid #94a3b8;
+  outline-offset: -2px;
+}
+
+.member-player-panel {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+}
+
+.member-player-panel > .expedition-stack {
+  gap: 16px;
+  padding: 0;
+}
+
+.member-player-panel > .player-footer-actions {
+  align-items: center;
+  border-top: 1px solid #dbe3ed;
+  background: transparent;
+  padding: 12px 0 0;
+}
+
+.member-manager-modal {
+  width: min(520px, 100%);
+}
+
+.member-manager-list {
+  border-top: 1px solid #e5ebf3;
+}
+
+.member-manager-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 52px;
+  border-bottom: 1px solid #e5ebf3;
+  padding: 7px 2px;
+}
+
+.member-manager-row .favorite-player-button {
+  justify-self: start;
+}
+
+.member-manager-name {
+  min-width: 0;
+  overflow: hidden;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-manager-name-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 5px 8px;
+  color: #111827;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+}
+
+.member-manager-name-input:focus {
+  border-color: #101827;
+  box-shadow: 0 0 0 2px rgb(15 23 42 / 9%);
+}
+
+.member-manager-edit-button,
+.member-manager-delete-button {
+  display: inline-flex;
+  min-height: 29px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.member-manager-edit-button {
+  gap: 4px;
+  padding: 0 7px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.member-manager-delete-button {
+  gap: 4px;
+  padding: 0 7px;
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.member-manager-edit-button:hover,
+.member-manager-delete-button:hover {
+  background: #f1f5f9;
+}
+
+.member-manager-edit-button .cool-icon,
+.member-manager-delete-button .cool-icon {
+  width: 15px;
+  height: 15px;
+}
+
+.member-manager-edit-button:focus-visible,
+.member-manager-delete-button:focus-visible {
+  outline: 2px solid #94a3b8;
+  outline-offset: 1px;
+}
+
+.member-manager-delete-button:disabled {
+  cursor: not-allowed;
+  opacity: .35;
+}
+
+@media (max-width: 640px) {
+  .member-player-tabs {
+    width: 100%;
+  }
+
+  .member-player-tab {
+    min-height: 36px;
+    padding-right: 9px;
+    padding-left: 9px;
+    font-size: 13px;
+  }
+
+  .member-player-tab::after {
+    right: 7px;
+    left: 7px;
+  }
+
+  .member-player-panel {
+    gap: 14px;
+  }
+
+  .member-player-panel > .expedition-stack {
+    gap: 14px;
+    padding: 0;
+  }
+
+  .member-player-panel > .player-footer-actions {
+    overflow-x: auto;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0 2px;
+    scrollbar-width: thin;
+  }
+
+  .member-player-panel > .player-footer-actions > div {
+    min-width: max-content;
+    flex: 0 0 auto;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+  }
+
+  .member-manager-modal {
+    padding: 16px 14px;
+  }
+
+  .member-manager-row {
+    grid-template-columns: 28px minmax(0, 1fr) auto auto;
+    gap: 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .member-manager-edit-button {
+    width: 32px;
+    padding: 0;
+  }
+
+  .member-manager-delete-button {
+    width: 30px;
+    padding: 0;
+  }
+
+  .member-manager-action-label {
+    display: none;
+  }
 }

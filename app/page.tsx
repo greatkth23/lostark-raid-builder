@@ -1567,6 +1567,119 @@ function mergeRosterIntoExpedition(
   };
 }
 
+function MemberManagerModal({
+  favoritePlayerId,
+  players,
+  editingPlayers,
+  onChangeNameDraft,
+  onClose,
+  onRemovePlayer,
+  onStartEditName,
+  onStopEditName,
+  onToggleFavorite,
+}: {
+  favoritePlayerId: string;
+  players: Player[];
+  editingPlayers: Map<string, { initialValue: string; value: string }>;
+  onChangeNameDraft: (playerId: string, value: string) => void;
+  onClose: () => void;
+  onRemovePlayer: (playerId: string) => void;
+  onStartEditName: (playerId: string, name: string) => void;
+  onStopEditName: (playerId: string, value: string) => void;
+  onToggleFavorite: (playerId: string) => void;
+}) {
+  return (
+    <div className="settings-modal-backdrop">
+      <section
+        className="settings-modal member-manager-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="member-manager-title"
+      >
+        <div className="settings-modal-head">
+          <div>
+            <h2 id="member-manager-title">멤버 관리</h2>
+            <p>즐겨찾기, 이름, 멤버 삭제를 한곳에서 관리합니다.</p>
+          </div>
+          <button
+            className="settings-close-button"
+            type="button"
+            aria-label="멤버 관리 닫기"
+            onClick={onClose}
+          >
+            <CoolIcon name="close" />
+          </button>
+        </div>
+
+        <div className="member-manager-list">
+          {players.map((player) => {
+            const isFavorite = player.id === favoritePlayerId;
+            const playerNameDraft = editingPlayers.get(player.id);
+
+            return (
+              <div className="member-manager-row" key={player.id}>
+                <button
+                  className={`favorite-player-button${isFavorite ? " active" : ""}`}
+                  type="button"
+                  aria-label={`${player.name} ${isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}`}
+                  aria-pressed={isFavorite}
+                  title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}
+                  onClick={() => onToggleFavorite(player.id)}
+                >
+                  <CoolIcon name={isFavorite ? "starFilled" : "star"} />
+                </button>
+
+                {playerNameDraft ? (
+                  <input
+                    aria-label={`${player.name} 이름`}
+                    autoFocus
+                    className="member-manager-name-input"
+                    value={playerNameDraft.value}
+                    onBlur={(event) =>
+                      onStopEditName(player.id, event.currentTarget.value)
+                    }
+                    onChange={(event) =>
+                      onChangeNameDraft(player.id, event.target.value)
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === "Escape") {
+                        event.currentTarget.blur();
+                      }
+                    }}
+                  />
+                ) : (
+                  <strong className="member-manager-name">{player.name}</strong>
+                )}
+
+                <button
+                  className="member-manager-edit-button"
+                  type="button"
+                  aria-label={`${player.name} 이름 수정`}
+                  onClick={() => onStartEditName(player.id, player.name)}
+                >
+                  <CoolIcon name="edit" />
+                  <span className="member-manager-action-label">수정</span>
+                </button>
+                <button
+                  className="member-manager-delete-button"
+                  type="button"
+                  aria-label={`${player.name} 삭제`}
+                  title="플레이어 삭제"
+                  disabled={players.length === 1}
+                  onClick={() => onRemovePlayer(player.id)}
+                >
+                  <CoolIcon name="trash" />
+                  <span className="member-manager-action-label">삭제</span>
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function PlayerEditor({
   favoritePlayerId,
   players,
@@ -1656,7 +1769,7 @@ function PlayerEditor({
   >(
     new Map(),
   );
-  const [collapsedPlayers, setCollapsedPlayers] = useState<Set<string>>(new Set());
+  const [isMemberManagerOpen, setIsMemberManagerOpen] = useState(false);
   const [settingsTarget, setSettingsTarget] = useState<{
     playerId: string;
     expeditionId: string;
@@ -1666,6 +1779,12 @@ function PlayerEditor({
     if (!favorite) return players;
     return [favorite, ...players.filter((player) => player.id !== favorite.id)];
   }, [favoritePlayerId, players]);
+  const [activePlayerId, setActivePlayerId] = useState(
+    () => displayedPlayers[0]?.id ?? "",
+  );
+  const activePlayer =
+    displayedPlayers.find((player) => player.id === activePlayerId) ??
+    displayedPlayers[0];
 
   const hasActiveNameEdit =
     editingPlayers.size > 0 || editingExpeditions.size > 0;
@@ -1743,15 +1862,27 @@ function PlayerEditor({
     });
   };
 
-  const toggleCollapsedPlayer = (playerId: string) => {
-    setCollapsedPlayers((current) => {
-      const next = new Set(current);
-      if (next.has(playerId)) {
-        next.delete(playerId);
-      } else {
-        next.add(playerId);
-      }
-      return next;
+  const movePlayerTabFocus = (currentIndex: number, key: string) => {
+    let nextIndex = currentIndex;
+
+    if (key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % displayedPlayers.length;
+    } else if (key === "ArrowLeft") {
+      nextIndex =
+        (currentIndex - 1 + displayedPlayers.length) % displayedPlayers.length;
+    } else if (key === "Home") {
+      nextIndex = 0;
+    } else if (key === "End") {
+      nextIndex = displayedPlayers.length - 1;
+    } else {
+      return;
+    }
+
+    const nextPlayerId = displayedPlayers[nextIndex]?.id;
+    if (!nextPlayerId) return;
+    setActivePlayerId(nextPlayerId);
+    requestAnimationFrame(() => {
+      document.getElementById(`member-player-tab-${nextPlayerId}`)?.focus();
     });
   };
 
@@ -1790,6 +1921,16 @@ function PlayerEditor({
             <span className="member-action-label">완료 상태 초기화</span>
           </button>
           <button
+            className="ghost-button"
+            type="button"
+            aria-label="멤버 관리"
+            title="멤버 관리"
+            onClick={() => setIsMemberManagerOpen(true)}
+          >
+            <CoolIcon name="settings" />
+            <span className="member-action-label">멤버 관리</span>
+          </button>
+          <button
             className="dark-button"
             type="button"
             aria-label="플레이어 추가"
@@ -1802,164 +1943,139 @@ function PlayerEditor({
         </div>
       </div>
 
-      <div className="player-stack">
-        {displayedPlayers.map((player) => {
-          const playerCollapsed = collapsedPlayers.has(player.id);
-          const playerNameDraft = editingPlayers.get(player.id);
-          const isFavorite = player.id === favoritePlayerId;
+      <div
+        className="member-player-tabs"
+        role="tablist"
+        aria-label="플레이어 선택"
+      >
+        {displayedPlayers.map((player, index) => {
+          const isActive = player.id === activePlayer?.id;
 
           return (
-            <article
-              className={`player-card${playerCollapsed ? " collapsed" : ""}`}
-              id={`player-${player.id}`}
+            <button
+              className={`member-player-tab${isActive ? " active" : ""}`}
+              id={`member-player-tab-${player.id}`}
               key={player.id}
+              type="button"
+              role="tab"
+              aria-controls={`member-player-panel-${player.id}`}
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
+              onClick={() => setActivePlayerId(player.id)}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "ArrowRight" ||
+                  event.key === "ArrowLeft" ||
+                  event.key === "Home" ||
+                  event.key === "End"
+                ) {
+                  event.preventDefault();
+                  movePlayerTabFocus(index, event.key);
+                }
+              }}
             >
-              <div
-                className="player-card-head"
-                onClick={(event) => {
-                  const target = event.target as Element;
-                  if (target.closest("button, input")) return;
-                  toggleCollapsedPlayer(player.id);
-                }}
-              >
-                <div className="player-name-line">
-                  <button
-                    className={`favorite-player-button${isFavorite ? " active" : ""}`}
-                    type="button"
-                    aria-label={`${player.name} ${isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}`}
-                    aria-pressed={isFavorite}
-                    title={isFavorite ? "즐겨찾기 해제" : "즐겨찾기"}
-                    onClick={() => onToggleFavorite(player.id)}
-                  >
-                    <CoolIcon name={isFavorite ? "starFilled" : "star"} />
-                  </button>
-                  {playerNameDraft ? (
-                    <input
-                      aria-label="플레이어명"
-                      autoFocus
-                      className="plain-title-input"
-                      value={playerNameDraft.value}
-                      onBlur={(event) =>
-                        stopEditingPlayer(player.id, event.currentTarget.value)
-                      }
-                      onChange={(event) =>
-                        updateEditingPlayer(player.id, event.target.value)
-                      }
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === "Escape") {
-                          event.currentTarget.blur();
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span className="plain-title-text">{player.name}</span>
-                  )}
-                  <button
-                    className="icon-button edit-icon-button"
-                    type="button"
-                    aria-label="플레이어명 수정"
-                    onClick={() => startEditingPlayer(player.id, player.name)}
-                  >
-                    <CoolIcon name="edit" />
-                  </button>
-                </div>
-                <div className="player-head-right">
-                  <button
-                    className="collapse-button"
-                    type="button"
-                    aria-label={`${player.name} ${playerCollapsed ? "펼치기" : "접기"}`}
-                    aria-expanded={!playerCollapsed}
-                    title={playerCollapsed ? "플레이어 펼치기" : "플레이어 접기"}
-                    onClick={() => toggleCollapsedPlayer(player.id)}
-                  >
-                    <CoolIcon
-                      name="chevron"
-                      className={`fold-icon inline ${playerCollapsed ? "" : "expanded"}`}
-                    />
-                  </button>
-                </div>
-              </div>
-
-              <div
-                className={`player-collapsible ${playerCollapsed ? "collapsed" : "expanded"}`}
-                aria-hidden={playerCollapsed}
-              >
-                  <div className="expedition-stack">
-                    {player.expeditions.map((expedition) => (
-                      <ExpeditionBlock
-                        expedition={expedition}
-                        isSyncing={syncingId === `${player.id}:${expedition.id}`}
-                        key={expedition.id}
-                        player={player}
-                        raidWeek={raidWeek}
-                        onRestoreCharacter={onRestoreCharacter}
-                        onRemoveCharacter={onRemoveCharacter}
-                        onRemoveExpedition={onRemoveExpedition}
-                        onSetRole={onSetRole}
-                        onSetGoldPreference={onSetGoldPreference}
-                        onSetCompletion={onSetCompletion}
-                        onSyncRoster={onSyncRoster}
-                        onToggleRaid={onToggleRaid}
-                        onOpenSettings={() =>
-                          setSettingsTarget({
-                            playerId: player.id,
-                            expeditionId: expedition.id,
-                          })
-                        }
-                        isEditingName={editingExpeditions.has(expedition.id)}
-                        nameDraft={
-                          editingExpeditions.get(expedition.id)?.value ??
-                          expedition.name
-                        }
-                        onChangeNameDraft={(value) =>
-                          updateEditingExpedition(expedition.id, value)
-                        }
-                        onStartEditName={() =>
-                          startEditingExpedition(expedition.id, expedition.name)
-                        }
-                        onStopEditName={(value) =>
-                          stopEditingExpedition(player.id, expedition.id, value)
-                        }
-                      />
-                    ))}
-                  </div>
-                  <div className="player-footer-actions">
-                    <button
-                      className="danger-text-button player-delete-button"
-                      type="button"
-                      onClick={() => onRemovePlayer(player.id)}
-                      disabled={players.length === 1}
-                    >
-                      <CoolIcon name="trash" /> 플레이어 삭제
-                    </button>
-                    <div>
-                      <button
-                        className="ghost-button"
-                        type="button"
-                        onClick={onResetAllRaids}
-                      >
-                        <CoolIcon name="sliders" /> 레이드 자동 등록
-                      </button>
-                      <button
-                        className="dark-button"
-                        type="button"
-                        onClick={() => onAddExpedition(player.id)}
-                      >
-                        <CoolIcon name="add" /> 원정대 추가
-                      </button>
-                    </div>
-                  </div>
-              </div>
-            </article>
+              {player.name}
+            </button>
           );
         })}
       </div>
+
+      {activePlayer ? (
+        <article
+          className="member-player-panel"
+          id={`member-player-panel-${activePlayer.id}`}
+          role="tabpanel"
+          aria-labelledby={`member-player-tab-${activePlayer.id}`}
+        >
+          <div className="expedition-stack">
+            {activePlayer.expeditions.map((expedition) => (
+              <ExpeditionBlock
+                expedition={expedition}
+                isSyncing={
+                  syncingId === `${activePlayer.id}:${expedition.id}`
+                }
+                key={expedition.id}
+                player={activePlayer}
+                raidWeek={raidWeek}
+                onRestoreCharacter={onRestoreCharacter}
+                onRemoveCharacter={onRemoveCharacter}
+                onRemoveExpedition={onRemoveExpedition}
+                onSetRole={onSetRole}
+                onSetGoldPreference={onSetGoldPreference}
+                onSetCompletion={onSetCompletion}
+                onSyncRoster={onSyncRoster}
+                onToggleRaid={onToggleRaid}
+                onOpenSettings={() =>
+                  setSettingsTarget({
+                    playerId: activePlayer.id,
+                    expeditionId: expedition.id,
+                  })
+                }
+                isEditingName={editingExpeditions.has(expedition.id)}
+                nameDraft={
+                  editingExpeditions.get(expedition.id)?.value ?? expedition.name
+                }
+                onChangeNameDraft={(value) =>
+                  updateEditingExpedition(expedition.id, value)
+                }
+                onStartEditName={() =>
+                  startEditingExpedition(expedition.id, expedition.name)
+                }
+                onStopEditName={(value) =>
+                  stopEditingExpedition(activePlayer.id, expedition.id, value)
+                }
+              />
+            ))}
+          </div>
+
+          <div className="player-footer-actions">
+            <button
+              className="danger-text-button player-delete-button"
+              type="button"
+              onClick={() => onRemovePlayer(activePlayer.id)}
+              disabled={players.length === 1}
+            >
+              <CoolIcon name="trash" /> 플레이어 삭제
+            </button>
+            <div>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={onResetAllRaids}
+              >
+                <CoolIcon name="sliders" /> 레이드 자동 등록
+              </button>
+              <button
+                className="dark-button"
+                type="button"
+                onClick={() => onAddExpedition(activePlayer.id)}
+              >
+                <CoolIcon name="add" /> 원정대 추가
+              </button>
+            </div>
+          </div>
+        </article>
+      ) : null}
 
       <div className="member-bottom-actions">
         <button className="dark-button" type="button" onClick={onAddPlayer}>
           <CoolIcon name="add" /> 플레이어 추가
         </button>
       </div>
+
+      {isMemberManagerOpen ? (
+        <MemberManagerModal
+          favoritePlayerId={favoritePlayerId}
+          players={displayedPlayers}
+          editingPlayers={editingPlayers}
+          onChangeNameDraft={updateEditingPlayer}
+          onClose={() => setIsMemberManagerOpen(false)}
+          onRemovePlayer={onRemovePlayer}
+          onStartEditName={startEditingPlayer}
+          onStopEditName={stopEditingPlayer}
+          onToggleFavorite={onToggleFavorite}
+        />
+      ) : null}
 
       {settingsPlayer && settingsExpedition ? (
         <ExpeditionSettingsModal
