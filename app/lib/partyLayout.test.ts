@@ -5,6 +5,7 @@ import {
   selectGroupsForPartyView,
   findPlanGroup,
   movePartyMember,
+  sortGroupsForMemberMasonry,
 } from "./partyLayout";
 import {
   getRaidDefinition,
@@ -224,5 +225,51 @@ describe("멤버 조합 파티 필터", () => {
       "guardian-normal",
       "guardian-hard",
     ]);
+  });
+});
+
+describe("멤버별 Masonry 파티 정렬", () => {
+  const createMembers = (count: number, prefix: string) =>
+    Array.from({ length: count }, (_, index) => createMember({
+      id: `${prefix}-${index + 1}`,
+      playerId: `${prefix}-player-${index + 1}`,
+    }));
+
+  it("소속 캐릭터 수가 많은 파티를 먼저 정렬한다", () => {
+    const one = createGroup("one", "벨가르딘 노말", createMembers(1, "one"));
+    const four = createGroup("four", "벨가르딘 노말", createMembers(4, "four"));
+    const seven = createGroup("seven", "벨가르딘 노말", createMembers(7, "seven"));
+    const eight = createGroup("eight", "벨가르딘 노말", createMembers(8, "eight"));
+
+    const result = sortGroupsForMemberMasonry([one, four, seven, eight]);
+
+    expect(result.map((group) => group.id)).toEqual(["eight", "seven", "four", "one"]);
+  });
+
+  it("캐릭터 수가 같으면 8인 파티를 먼저 정렬한다", () => {
+    const fourPerson = createGroup("four-person", "성당 3단계", createMembers(4, "four-person"));
+    const eightPerson = createGroup("eight-person", "벨가르딘 노말", createMembers(4, "eight-person"));
+
+    const result = sortGroupsForMemberMasonry([fourPerson, eightPerson]);
+
+    expect(result.map((group) => group.id)).toEqual(["eight-person", "four-person"]);
+  });
+
+  it("캐릭터 수와 정원이 같으면 입장 레벨이 높은 레이드를 먼저 정렬한다", () => {
+    const normal = createGroup("normal", "벨가르딘 노말", createMembers(3, "normal"));
+    const nightmare = createGroup("nightmare", "벨가르딘 나메", createMembers(3, "nightmare"));
+
+    const result = sortGroupsForMemberMasonry([normal, nightmare]);
+
+    expect(result.map((group) => group.id)).toEqual(["nightmare", "normal"]);
+  });
+
+  it("앞선 조건이 같으면 원본 공대 번호가 낮은 파티를 먼저 정렬한다", () => {
+    const first = createGroup("first", "4막 노말", createMembers(3, "first"));
+    const second = createGroup("second", "4막 노말", createMembers(3, "second"));
+
+    const result = sortGroupsForMemberMasonry([second, first], [first, second]);
+
+    expect(result.map((group) => group.id)).toEqual(["first", "second"]);
   });
 });

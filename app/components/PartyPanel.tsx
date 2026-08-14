@@ -10,6 +10,7 @@ import {
   canReplaceMember,
   filterGroupsBySelectedPlayerIds,
   selectGroupsForPartyView,
+  sortGroupsForMemberMasonry,
 } from "../lib/partyLayout";
 import type { Player } from "../lib/raidData";
 
@@ -181,15 +182,17 @@ export default function PartyPanel({
     () => filterGroupsBySelectedPlayerIds(visibleGroups, activeSelectedPlayerIds),
     [activeSelectedPlayerIds, visibleGroups],
   );
-  const displayedGroups = useMemo(
-    () => selectGroupsForPartyView(
+  const displayedGroups = useMemo(() => {
+    const selectedGroups = selectGroupsForPartyView(
       visibleGroups,
       viewMode === "raid"
         ? { mode: "raid", raidFamily: activeRaidFamily }
         : { mode: "member", selectedPlayerIds: activeSelectedPlayerIds },
-    ),
-    [activeRaidFamily, activeSelectedPlayerIds, viewMode, visibleGroups],
-  );
+    );
+    return viewMode === "member"
+      ? sortGroupsForMemberMasonry(selectedGroups, groups)
+      : selectedGroups;
+  }, [activeRaidFamily, activeSelectedPlayerIds, groups, viewMode, visibleGroups]);
   const resultPanelKey = viewMode === "raid"
     ? `raid:${activeRaidFamily}`
     : `member:${Array.from(activeSelectedPlayerIds).sort().join(",")}`;

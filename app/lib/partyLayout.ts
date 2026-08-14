@@ -107,6 +107,33 @@ export const selectGroupsForPartyView = (
   ? filterGroupsBySelectedPlayerIds(groups, selection.selectedPlayerIds)
   : filterGroupsByRaidFamily(groups, selection.raidFamily);
 
+export const sortGroupsForMemberMasonry = (
+  groups: RaidGroup[],
+  allGroups: RaidGroup[] = groups,
+) => {
+  const nextGroupNumberByRaid = new Map<string, number>();
+  const groupNumbers = new Map<string, number>();
+
+  allGroups.forEach((group) => {
+    const groupNumber = (nextGroupNumberByRaid.get(group.raidName) ?? 0) + 1;
+    nextGroupNumberByRaid.set(group.raidName, groupNumber);
+    groupNumbers.set(group.id, groupNumber);
+  });
+
+  return groups
+    .map((group, index) => ({ group, index }))
+    .sort((a, b) =>
+      b.group.members.length - a.group.members.length ||
+      b.group.size - a.group.size ||
+      (getRaidDefinition(b.group.raidName)?.minItemLevel ?? 0) -
+        (getRaidDefinition(a.group.raidName)?.minItemLevel ?? 0) ||
+      (groupNumbers.get(a.group.id) ?? Number.MAX_SAFE_INTEGER) -
+        (groupNumbers.get(b.group.id) ?? Number.MAX_SAFE_INTEGER) ||
+      a.index - b.index,
+    )
+    .map(({ group }) => group);
+};
+
 export const findPlanGroup = (plan: RaidPlanResult, groupId: string) =>
   allPlanGroups(plan).find((group) => group.id === groupId);
 
