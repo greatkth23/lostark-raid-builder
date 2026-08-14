@@ -341,7 +341,7 @@
 .party-empty-slot {
   display: grid;
   min-height: 27px;
-  grid-template-columns: 32px minmax(0, 1fr) 66px 54px 60px 18px;
+  grid-template-columns: 32px minmax(0, 1fr) 82px 54px 60px 18px;
   align-items: center;
   gap: 3px;
   border-bottom: 0;
@@ -451,7 +451,7 @@
 .party-modal-footer button { min-height: 36px; border: 1px solid #dbe3ed; border-radius: 7px; background: #fff; padding: 0 15px; }
 
 @media (max-width: 1300px) {
-  .party-character-row { grid-template-columns: 32px minmax(0, 1fr) 66px 18px; }
+  .party-character-row { grid-template-columns: 32px minmax(0, 1fr) 82px 18px; }
   .party-character-row .party-level,
   .party-character-row .party-power { display: none; }
 }
@@ -470,7 +470,7 @@
   .party-name-control button { width: 35px; justify-content: center; padding: 0; }
   .party-card-row { display: flex; overflow-x: auto; scrollbar-width: thin; }
   .party-card { flex: 0 0 min(390px, calc(100vw - 72px)); padding: 18px 14px 14px; }
-  .party-character-row { grid-template-columns: 32px minmax(0, 1fr) 68px 18px; }
+  .party-character-row { grid-template-columns: 32px minmax(0, 1fr) 82px 18px; }
   .party-current-character,
   .party-swap-candidates button { grid-template-columns: 38px minmax(70px, 1fr) auto; }
   .party-current-character > span:nth-of-type(3),
