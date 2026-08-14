@@ -341,7 +341,7 @@
 .party-empty-slot {
   display: grid;
   min-height: 27px;
-  grid-template-columns: 32px minmax(0, 1fr) 82px 54px 60px 18px;
+  grid-template-columns: 32px minmax(0, 1fr) 87px 44px 60px 18px;
   align-items: center;
   gap: 3px;
   border-bottom: 0;
@@ -353,8 +353,9 @@
 .party-character-row[draggable="true"]:active { cursor: grabbing; }
 .party-character-row > * { min-width: 0; }
 .party-character-name { overflow: hidden; padding-left: 1px; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 400; }
-.party-class-name, .party-level { width: 100%; overflow: hidden; color: #64748b; text-overflow: ellipsis; white-space: nowrap; }
-.party-class-name { padding-left: 4px; text-align: left; }
+.party-class-name, .party-level { overflow: hidden; color: #64748b; text-overflow: ellipsis; white-space: nowrap; }
+.party-class-name { width: 72px; padding-left: 4px; text-align: left; }
+.party-level { width: 100%; }
 .party-level { text-align: right; }
 .party-power { display: inline-flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 2px; color: #f97316; white-space: nowrap; }
 .party-power.support { color: #16a34a; }
@@ -451,7 +452,7 @@
 .party-modal-footer button { min-height: 36px; border: 1px solid #dbe3ed; border-radius: 7px; background: #fff; padding: 0 15px; }
 
 @media (max-width: 1300px) {
-  .party-character-row { grid-template-columns: 32px minmax(0, 1fr) 82px 18px; }
+  .party-character-row { grid-template-columns: 32px minmax(0, 1fr) 72px 18px; }
   .party-character-row .party-level,
   .party-character-row .party-power { display: none; }
 }
@@ -470,7 +471,7 @@
   .party-name-control button { width: 35px; justify-content: center; padding: 0; }
   .party-card-row { display: flex; overflow-x: auto; scrollbar-width: thin; }
   .party-card { flex: 0 0 min(390px, calc(100vw - 72px)); padding: 18px 14px 14px; }
-  .party-character-row { grid-template-columns: 32px minmax(0, 1fr) 82px 18px; }
+  .party-character-row { grid-template-columns: 32px minmax(0, 1fr) 72px 18px; }
   .party-current-character,
   .party-swap-candidates button { grid-template-columns: 38px minmax(70px, 1fr) auto; }
   .party-current-character > span:nth-of-type(3),
