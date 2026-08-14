@@ -211,7 +211,7 @@
   max-width: 100%;
   min-width: 0;
   align-self: flex-start;
-  gap: 0;
+  gap: 8px;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   background: linear-gradient(#e2e8f0, #e2e8f0) left bottom / 100% 1px no-repeat;
@@ -259,7 +259,7 @@
 }
 
 .party-raid-tabs button:first-child {
-  margin-right: 8px;
+  margin-right: 0;
   padding-right: 16px;
   padding-left: 0;
 }
