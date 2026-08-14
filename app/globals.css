@@ -4850,3 +4850,29 @@ button:not(:disabled) {
     display: none;
   }
 }
+
+/* Tighten character cards while giving completion controls a clearer target. */
+.integrated-character-card {
+  padding: 12px 12px 10px;
+}
+
+.integrated-raid-card {
+  gap: 10px;
+  padding: 7px 12px;
+}
+
+.integrated-raid-card > .raid-completion-indicator,
+.integrated-raid-card > .raid-completion-indicator input {
+  width: 20px;
+  height: 20px;
+}
+
+@media (max-width: 640px) {
+  .integrated-character-card {
+    padding: 12px 10px 10px;
+  }
+
+  .integrated-raid-card {
+    padding: 7px 12px;
+  }
+}
