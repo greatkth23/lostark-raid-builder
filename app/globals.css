@@ -258,25 +258,13 @@
   background: #101827;
 }
 
-.party-raid-tabs button:first-child {
-  margin-right: 0;
-  padding-right: 16px;
-  padding-left: 0;
-}
-
-.party-raid-tabs button:first-child::after {
-  left: 0;
-  right: 8px;
-}
-
-.party-raid-tabs button:first-child::before {
-  position: absolute;
-  top: 9px;
-  right: 0;
+.party-raid-tab-divider {
+  display: block;
   width: 1px;
   height: 20px;
+  flex: 0 0 1px;
+  align-self: center;
   background: #dbe3ed;
-  content: "";
 }
 
 .party-card-row {
@@ -4626,13 +4614,14 @@ button:not(:disabled) {
 /* Member player tabs and unboxed active-player workspace */
 .member-player-tabs {
   display: flex;
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
   min-width: 0;
   align-items: stretch;
   gap: 0;
   overflow-x: auto;
   overscroll-behavior-x: contain;
+  background: linear-gradient(#e2e8f0, #e2e8f0) left bottom / 100% 1px no-repeat;
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
 }
@@ -4824,7 +4813,7 @@ button:not(:disabled) {
     min-height: 36px;
     padding-right: 9px;
     padding-left: 9px;
-    font-size: 13px;
+    font-size: 14px;
   }
 
   .member-player-tab::after {
@@ -4842,20 +4831,26 @@ button:not(:disabled) {
   }
 
   .member-player-panel > .player-footer-actions {
-    overflow-x: auto;
+    overflow-x: visible;
     flex-direction: row;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 0 2px;
-    scrollbar-width: thin;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px 0 0;
   }
 
   .member-player-panel > .player-footer-actions > div {
-    min-width: max-content;
-    flex: 0 0 auto;
-    flex-wrap: nowrap;
-    justify-content: flex-end;
+    display: grid;
+    width: 100%;
+    min-width: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    flex: 1 0 100%;
+    gap: 8px;
+  }
+
+  .member-player-panel > .player-footer-actions > div > button {
+    min-width: 0;
+    justify-content: center;
   }
 
   .member-manager-modal {

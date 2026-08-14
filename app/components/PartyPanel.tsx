@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import lostarkGoldIcon from "../../lostark_gold.png";
 import { getRaidDefinition, roleLabel, type AssignedMember, type RaidGroup, type RaidPlanResult } from "../lib/raidPlanner";
@@ -435,34 +435,36 @@ function RaidFamilyTabs({ items, value, onChange }: {
       {items.map((item, index) => {
         const selected = item.family === value;
         return (
-          <button
-            className={selected ? "active" : ""}
-            id={item.tabId}
-            key={item.family}
-            type="button"
-            role="tab"
-            tabIndex={selected ? 0 : -1}
-            aria-selected={selected}
-            aria-controls="party-raid-family-panel"
-            onClick={() => onChange(item.family)}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowRight") {
-                event.preventDefault();
-                moveSelection(index, (index + 1) % items.length);
-              } else if (event.key === "ArrowLeft") {
-                event.preventDefault();
-                moveSelection(index, (index - 1 + items.length) % items.length);
-              } else if (event.key === "Home") {
-                event.preventDefault();
-                moveSelection(index, 0);
-              } else if (event.key === "End") {
-                event.preventDefault();
-                moveSelection(index, items.length - 1);
-              }
-            }}
-          >
-            {item.label}
-          </button>
+          <Fragment key={item.family}>
+            <button
+              className={selected ? "active" : ""}
+              id={item.tabId}
+              type="button"
+              role="tab"
+              tabIndex={selected ? 0 : -1}
+              aria-selected={selected}
+              aria-controls="party-raid-family-panel"
+              onClick={() => onChange(item.family)}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowRight") {
+                  event.preventDefault();
+                  moveSelection(index, (index + 1) % items.length);
+                } else if (event.key === "ArrowLeft") {
+                  event.preventDefault();
+                  moveSelection(index, (index - 1 + items.length) % items.length);
+                } else if (event.key === "Home") {
+                  event.preventDefault();
+                  moveSelection(index, 0);
+                } else if (event.key === "End") {
+                  event.preventDefault();
+                  moveSelection(index, items.length - 1);
+                }
+              }}
+            >
+              {item.label}
+            </button>
+            {index === 0 ? <span className="party-raid-tab-divider" aria-hidden="true" /> : null}
+          </Fragment>
         );
       })}
     </div>
