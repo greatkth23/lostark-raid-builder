@@ -355,7 +355,7 @@
 .party-character-name { overflow: hidden; padding-left: 1px; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 400; }
 .party-class-name, .party-level { overflow: hidden; color: #64748b; text-overflow: ellipsis; white-space: nowrap; }
 .party-class-name { width: 72px; padding-left: 4px; text-align: left; }
-.party-level { width: 100%; text-align: left; }
+.party-level { width: 100%; padding-left: 10px; text-align: left; }
 .party-power { display: inline-flex; min-width: 0; align-items: center; justify-content: flex-end; gap: 2px; color: #f97316; white-space: nowrap; }
 .party-power.support { color: #16a34a; }
 .party-character-row > button {
