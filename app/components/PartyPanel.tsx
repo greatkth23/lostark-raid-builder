@@ -312,6 +312,7 @@ export default function PartyPanel({
           <PartyGroupGrid
             groups={displayedGroups}
             allGroups={groups}
+            masonry={viewMode === "member"}
             completedPartyIds={completedPartyIds}
             departingPartyIds={departingPartyIds}
             displayName={displayName}
@@ -472,9 +473,10 @@ function RaidFamilyTabs({ items, value, onChange }: {
   );
 }
 
-function PartyGroupGrid({ groups, allGroups, completedPartyIds, departingPartyIds, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
+function PartyGroupGrid({ groups, allGroups, masonry, completedPartyIds, departingPartyIds, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
   groups: RaidGroup[];
   allGroups: RaidGroup[];
+  masonry: boolean;
   completedPartyIds: Set<string>;
   departingPartyIds: Set<string>;
   displayName: (member: AssignedMember) => string;
@@ -487,7 +489,7 @@ function PartyGroupGrid({ groups, allGroups, completedPartyIds, departingPartyId
   onToggleComplete: (group: RaidGroup, completed: boolean) => void;
 }) {
   return (
-    <div className="party-card-row">
+    <div className={`party-card-row${masonry ? " masonry" : ""}`}>
       {groups.map((group) => (
         <PartyCard
           key={group.id}
