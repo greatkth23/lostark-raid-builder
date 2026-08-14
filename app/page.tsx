@@ -2032,25 +2032,34 @@ function PlayerEditor({
             <button
               className="danger-text-button player-delete-button"
               type="button"
+              aria-label="플레이어 삭제"
+              title="플레이어 삭제"
               onClick={() => onRemovePlayer(activePlayer.id)}
               disabled={players.length === 1}
             >
-              <CoolIcon name="trash" /> 플레이어 삭제
+              <CoolIcon name="trash" />
+              <span className="player-footer-label">플레이어 삭제</span>
             </button>
             <div>
               <button
                 className="ghost-button"
                 type="button"
+                aria-label="레이드 자동 등록"
+                title="레이드 자동 등록"
                 onClick={onResetAllRaids}
               >
-                <CoolIcon name="sliders" /> 레이드 자동 등록
+                <CoolIcon name="sliders" />
+                <span className="player-footer-label">레이드 자동 등록</span>
               </button>
               <button
                 className="dark-button"
                 type="button"
+                aria-label="원정대 추가"
+                title="원정대 추가"
                 onClick={() => onAddExpedition(activePlayer.id)}
               >
-                <CoolIcon name="add" /> 원정대 추가
+                <CoolIcon name="add" />
+                <span className="player-footer-label">원정대 추가</span>
               </button>
             </div>
           </div>

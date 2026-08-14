@@ -4198,6 +4198,19 @@ button:not(:disabled) {
   color: #ef4444;
 }
 
+.member-shell .player-delete-button,
+.member-shell .expedition-actions .danger-text-button {
+  border-color: #fecaca;
+  background: #fffafa;
+}
+
+.member-shell .expedition-actions .ghost-button,
+.member-shell .expedition-actions .danger-text-button,
+.member-shell .player-footer-actions > .player-delete-button,
+.member-shell .player-footer-actions > div > button {
+  font-size: 13px;
+}
+
 .member-shell .ghost-button .cool-icon,
 .member-shell .dark-button .cool-icon,
 .member-shell .danger-text-button .cool-icon,
@@ -4833,24 +4846,31 @@ button:not(:disabled) {
   .member-player-panel > .player-footer-actions {
     overflow-x: visible;
     flex-direction: row;
-    flex-wrap: wrap;
-    align-items: stretch;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: space-between;
     gap: 8px;
     padding: 10px 0 0;
   }
 
   .member-player-panel > .player-footer-actions > div {
-    display: grid;
-    width: 100%;
-    min-width: 0;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    flex: 1 0 100%;
-    gap: 8px;
+    display: contents;
   }
 
+  .member-player-panel > .player-footer-actions > .player-delete-button,
   .member-player-panel > .player-footer-actions > div > button {
-    min-width: 0;
+    display: inline-flex;
+    width: 31px;
+    min-width: 31px;
+    height: 31px;
+    min-height: 31px;
+    flex: 0 0 31px;
     justify-content: center;
+    padding: 0;
+  }
+
+  .member-player-panel .player-footer-label {
+    display: none;
   }
 
   .member-manager-modal {
