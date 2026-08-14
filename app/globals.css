@@ -214,6 +214,7 @@
   gap: 0;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
+  background: linear-gradient(#e2e8f0, #e2e8f0) left bottom / 100% 1px no-repeat;
   scrollbar-width: thin;
 }
 
@@ -229,7 +230,7 @@
   background: transparent;
   padding: 0 8px 2px;
   color: #64748b;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   transition: color .15s;
 }
@@ -258,11 +259,24 @@
 }
 
 .party-raid-tabs button:first-child {
+  margin-right: 8px;
+  padding-right: 16px;
   padding-left: 0;
 }
 
 .party-raid-tabs button:first-child::after {
   left: 0;
+  right: 8px;
+}
+
+.party-raid-tabs button:first-child::before {
+  position: absolute;
+  top: 9px;
+  right: 0;
+  width: 1px;
+  height: 20px;
+  background: #dbe3ed;
+  content: "";
 }
 
 .party-card-row {
