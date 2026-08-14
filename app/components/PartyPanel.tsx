@@ -9,6 +9,7 @@ import {
   canPlaceMember,
   canReplaceMember,
   filterGroupsBySelectedPlayerIds,
+  selectGroupsForPartyView,
 } from "../lib/partyLayout";
 import type { Player } from "../lib/raidData";
 
@@ -180,6 +181,18 @@ export default function PartyPanel({
     () => filterGroupsBySelectedPlayerIds(visibleGroups, activeSelectedPlayerIds),
     [activeSelectedPlayerIds, visibleGroups],
   );
+  const displayedGroups = useMemo(
+    () => selectGroupsForPartyView(
+      visibleGroups,
+      viewMode === "raid"
+        ? { mode: "raid", raidFamily: activeRaidFamily }
+        : { mode: "member", selectedPlayerIds: activeSelectedPlayerIds },
+    ),
+    [activeRaidFamily, activeSelectedPlayerIds, viewMode, visibleGroups],
+  );
+  const resultPanelKey = viewMode === "raid"
+    ? `raid:${activeRaidFamily}`
+    : `member:${Array.from(activeSelectedPlayerIds).sort().join(",")}`;
   const selectedPlayerNames = useMemo(
     () => sortedPlayers
       .filter((player) => activeSelectedPlayerIds.has(player.id))
@@ -285,35 +298,19 @@ export default function PartyPanel({
           <strong>구성할 레이드가 없습니다.</strong>
           <span>멤버 목록에서 레이드를 선택한 뒤 자동구성을 눌러 주세요.</span>
         </div>
-      ) : viewMode === "raid" ? (
+      ) : displayedGroups.length ? (
         <section
+          key={resultPanelKey}
           className="party-results-section"
-          role="tabpanel"
-          id="party-raid-family-panel"
-          aria-labelledby={raidFamilyTabs.find((item) => item.family === activeRaidFamily)?.tabId}
+          role={viewMode === "raid" ? "tabpanel" : undefined}
+          id={viewMode === "raid" ? "party-raid-family-panel" : undefined}
+          aria-labelledby={viewMode === "raid"
+            ? raidFamilyTabs.find((item) => item.family === activeRaidFamily)?.tabId
+            : undefined}
+          aria-live={viewMode === "member" ? "polite" : undefined}
         >
           <PartyGroupGrid
-            groups={groupsByFamily.get(activeRaidFamily) ?? []}
-            allGroups={groups}
-            completedPartyIds={completedPartyIds}
-            departingPartyIds={departingPartyIds}
-            displayName={displayName}
-            dragging={dragging}
-            onDragStart={setDragging}
-            onDragEnd={() => setDragging(null)}
-            onDrop={(targetGroupId) => {
-              if (dragging) onMove(dragging.memberId, dragging.groupId, targetGroupId);
-              setDragging(null);
-            }}
-            onOpenSwap={(group, member) => setSwapState({ group, member })}
-            onOpenAdd={(group, role) => setAddState({ group, role })}
-            onToggleComplete={handleToggleComplete}
-          />
-        </section>
-      ) : selectedMemberGroups.length ? (
-        <section className="party-results-section" aria-live="polite">
-          <PartyGroupGrid
-            groups={selectedMemberGroups}
+            groups={displayedGroups}
             allGroups={groups}
             completedPartyIds={completedPartyIds}
             departingPartyIds={departingPartyIds}
@@ -332,8 +329,8 @@ export default function PartyPanel({
         </section>
       ) : (
         <div className="party-empty party-filter-empty" aria-live="polite">
-          <strong>선택한 멤버 조건의 파티가 없습니다.</strong>
-          <span>멤버 선택을 바꾸거나 모두 해제해 전체 파티를 확인해 주세요.</span>
+          <strong>{viewMode === "raid" ? "선택한 레이드의 파티가 없습니다." : "선택한 멤버 조건의 파티가 없습니다."}</strong>
+          <span>{viewMode === "raid" ? "다른 레이드 탭을 선택해 주세요." : "멤버 선택을 바꾸거나 모두 해제해 전체 파티를 확인해 주세요."}</span>
         </div>
       )}
 

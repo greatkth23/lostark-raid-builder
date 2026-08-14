@@ -91,6 +91,22 @@ export const filterGroupsBySelectedPlayerIds = (
   });
 };
 
+export const filterGroupsByRaidFamily = (
+  groups: RaidGroup[],
+  raidFamily: string,
+) => groups.filter((group) =>
+  (getRaidDefinition(group.raidName)?.family ?? group.raidName) === raidFamily,
+);
+
+export const selectGroupsForPartyView = (
+  groups: RaidGroup[],
+  selection:
+    | { mode: "member"; selectedPlayerIds: ReadonlySet<string> }
+    | { mode: "raid"; raidFamily: string },
+) => selection.mode === "member"
+  ? filterGroupsBySelectedPlayerIds(groups, selection.selectedPlayerIds)
+  : filterGroupsByRaidFamily(groups, selection.raidFamily);
+
 export const findPlanGroup = (plan: RaidPlanResult, groupId: string) =>
   allPlanGroups(plan).find((group) => group.id === groupId);
 

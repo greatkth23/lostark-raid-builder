@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   filterGroupsBySelectedPlayerIds,
+  selectGroupsForPartyView,
   findPlanGroup,
   movePartyMember,
 } from "./partyLayout";
@@ -195,5 +196,33 @@ describe("멤버 조합 파티 필터", () => {
     );
 
     expect(result.map((group) => group.id)).toEqual(["duplicate"]);
+  });
+
+  it("멤버별 보기에서는 복수 선택과 정확히 같은 파티만 렌더링한다", () => {
+    const result = selectGroupsForPartyView(groups, {
+      mode: "member",
+      selectedPlayerIds: new Set(["alpha", "beta"]),
+    });
+
+    expect(result.map((group) => group.id)).toEqual(["pair"]);
+  });
+
+  it("레이드별 보기에서는 선택한 계열의 난이도 파티만 렌더링한다", () => {
+    const normal = createGroup("guardian-normal", "벨가르딘 노말", [
+      createMember({ id: "beta-normal", playerId: "beta" }),
+    ]);
+    const hard = createGroup("guardian-hard", "벨가르딘 하드", [
+      createMember({ id: "alpha-hard", playerId: "alpha" }),
+    ]);
+
+    const result = selectGroupsForPartyView(
+      [normal, single, hard, pair, trio],
+      { mode: "raid", raidFamily: "벨가르딘" },
+    );
+
+    expect(result.map((group) => group.id)).toEqual([
+      "guardian-normal",
+      "guardian-hard",
+    ]);
   });
 });
