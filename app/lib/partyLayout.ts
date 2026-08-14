@@ -64,6 +64,33 @@ const validateMembers = (group: RaidGroup, members: RaidGroup["members"]) => {
 export const allPlanGroups = (plan: RaidPlanResult) =>
   Object.values(plan.groupsByRaid).flat();
 
+export const filterGroupsBySelectedPlayerIds = (
+  groups: RaidGroup[],
+  selectedPlayerIds: ReadonlySet<string>,
+) => {
+  if (selectedPlayerIds.size === 0) return groups;
+
+  const selectedPlayerId = selectedPlayerIds.size === 1
+    ? selectedPlayerIds.values().next().value
+    : undefined;
+
+  if (selectedPlayerId) {
+    return groups.filter((group) =>
+      group.members.some((member) => member.playerId === selectedPlayerId),
+    );
+  }
+
+  return groups.filter((group) => {
+    const groupPlayerIds = new Set(
+      group.members.map((member) => member.playerId),
+    );
+    if (groupPlayerIds.size !== selectedPlayerIds.size) return false;
+    return Array.from(selectedPlayerIds).every((playerId) =>
+      groupPlayerIds.has(playerId),
+    );
+  });
+};
+
 export const findPlanGroup = (plan: RaidPlanResult, groupId: string) =>
   allPlanGroups(plan).find((group) => group.id === groupId);
 

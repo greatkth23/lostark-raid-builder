@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  filterGroupsBySelectedPlayerIds,
   findPlanGroup,
   movePartyMember,
 } from "./partyLayout";
@@ -133,5 +134,66 @@ describe("파티 드래그 이동", () => {
       existing.id,
       moved.id,
     ]);
+  });
+});
+
+describe("멤버 조합 파티 필터", () => {
+  const single = createGroup("single", "성당 3단계", [
+    createMember({ id: "alpha-cathedral", playerId: "alpha" }),
+  ]);
+  const pair = createGroup("pair", "세르카 하드", [
+    createMember({ id: "alpha-serka", playerId: "alpha" }),
+    createMember({ id: "beta-serka", playerId: "beta" }),
+  ]);
+  const trio = createGroup("trio", "4막 하드", [
+    createMember({ id: "alpha-act4", playerId: "alpha" }),
+    createMember({ id: "beta-act4", playerId: "beta" }),
+    createMember({ id: "gamma-act4", playerId: "gamma" }),
+  ]);
+  const groups = [single, pair, trio];
+
+  it("선택한 멤버가 없으면 기존 순서와 배열을 그대로 반환한다", () => {
+    const result = filterGroupsBySelectedPlayerIds(groups, new Set());
+
+    expect(result).toBe(groups);
+    expect(result.map((group) => group.id)).toEqual(["single", "pair", "trio"]);
+  });
+
+  it("단일 멤버를 선택하면 그 멤버가 포함된 모든 파티를 찾는다", () => {
+    const result = filterGroupsBySelectedPlayerIds(groups, new Set(["alpha"]));
+
+    expect(result.map((group) => group.id)).toEqual(["single", "pair", "trio"]);
+  });
+
+  it("복수 멤버 선택 순서와 무관하게 정확한 조합만 찾는다", () => {
+    const result = filterGroupsBySelectedPlayerIds(
+      groups,
+      new Set(["beta", "alpha"]),
+    );
+
+    expect(result.map((group) => group.id)).toEqual(["pair"]);
+  });
+
+  it("멤버가 부족하거나 선택하지 않은 멤버가 추가된 파티는 제외한다", () => {
+    const result = filterGroupsBySelectedPlayerIds(
+      groups,
+      new Set(["alpha", "gamma"]),
+    );
+
+    expect(result).toEqual([]);
+  });
+
+  it("한 플레이어의 캐릭터가 중복되어도 결과 카드는 중복하지 않는다", () => {
+    const duplicateCharacters = createGroup("duplicate", "성당 3단계", [
+      createMember({ id: "alpha-one", playerId: "alpha" }),
+      createMember({ id: "alpha-two", playerId: "alpha" }),
+    ]);
+
+    const result = filterGroupsBySelectedPlayerIds(
+      [duplicateCharacters],
+      new Set(["alpha"]),
+    );
+
+    expect(result.map((group) => group.id)).toEqual(["duplicate"]);
   });
 });

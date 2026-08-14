@@ -4,7 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import lostarkGoldIcon from "../../lostark_gold.png";
 import { getRaidDefinition, roleLabel, type AssignedMember, type RaidGroup, type RaidPlanResult } from "../lib/raidPlanner";
-import { allPlanGroups, canPlaceMember, canReplaceMember } from "../lib/partyLayout";
+import {
+  allPlanGroups,
+  canPlaceMember,
+  canReplaceMember,
+  filterGroupsBySelectedPlayerIds,
+} from "../lib/partyLayout";
 import type { Player } from "../lib/raidData";
 
 type ViewMode = "raid" | "member";
@@ -45,7 +50,6 @@ const PARTY_ICON_PATHS = {
   reload: "/icons/reload.svg",
   dealer: "/icons/dealer.svg",
   shield: "/icons/shield.svg",
-  star: "/icons/star.svg",
   tag: "/icons/tag.svg",
   user03: "/icons/user-03.svg",
 } as const;
@@ -76,8 +80,13 @@ export default function PartyPanel({
   onSwap,
   onToggleComplete,
 }: PartyPanelProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("raid");
+  const [viewMode, setViewMode] = useState<ViewMode>("member");
   const [nameMode, setNameMode] = useState<NameMode>("character");
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [selectedRaidFamily, setSelectedRaidFamily] = useState("");
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [dragging, setDragging] = useState<{ memberId: string; groupId: string } | null>(null);
   const [swapState, setSwapState] = useState<SwapState>(null);
   const [addState, setAddState] = useState<AddState>(null);
@@ -88,21 +97,22 @@ export default function PartyPanel({
     const timeoutId = window.setTimeout(() => {
       try {
         const stored = JSON.parse(window.localStorage.getItem(PREFERENCE_KEY) ?? "{}") as {
-          viewMode?: ViewMode;
           nameMode?: NameMode;
         };
-        if (stored.viewMode === "raid" || stored.viewMode === "member") setViewMode(stored.viewMode);
         if (stored.nameMode === "character" || stored.nameMode === "nickname") setNameMode(stored.nameMode);
       } catch {
         window.localStorage.removeItem(PREFERENCE_KEY);
+      } finally {
+        setPreferencesLoaded(true);
       }
     }, 0);
     return () => window.clearTimeout(timeoutId);
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(PREFERENCE_KEY, JSON.stringify({ viewMode, nameMode }));
-  }, [viewMode, nameMode]);
+    if (!preferencesLoaded) return;
+    window.localStorage.setItem(PREFERENCE_KEY, JSON.stringify({ nameMode }));
+  }, [nameMode, preferencesLoaded]);
 
   useEffect(() => () => {
     exitTimersRef.current.forEach((timerId) => window.clearTimeout(timerId));
@@ -143,15 +153,51 @@ export default function PartyPanel({
     });
     return result;
   }, [visibleGroups]);
+  const raidFamilyTabs = useMemo(
+    () => Array.from(groupsByFamily.entries()).map(([family, familyGroups], index) => ({
+      family,
+      groups: familyGroups,
+      tabId: `party-raid-family-tab-${index}`,
+    })),
+    [groupsByFamily],
+  );
+  const activeRaidFamily = groupsByFamily.has(selectedRaidFamily)
+    ? selectedRaidFamily
+    : raidFamilyTabs[0]?.family ?? "";
 
   const sortedPlayers = useMemo(() => [...players].sort((a, b) => {
     if (a.id === favoritePlayerId) return -1;
     if (b.id === favoritePlayerId) return 1;
     return a.name.localeCompare(b.name, "ko");
   }), [favoritePlayerId, players]);
+  const activeSelectedPlayerIds = useMemo(() => {
+    const validPlayerIds = new Set(players.map((player) => player.id));
+    return new Set(
+      Array.from(selectedPlayerIds).filter((playerId) => validPlayerIds.has(playerId)),
+    );
+  }, [players, selectedPlayerIds]);
+  const selectedMemberGroups = useMemo(
+    () => filterGroupsBySelectedPlayerIds(visibleGroups, activeSelectedPlayerIds),
+    [activeSelectedPlayerIds, visibleGroups],
+  );
+  const selectedPlayerNames = useMemo(
+    () => sortedPlayers
+      .filter((player) => activeSelectedPlayerIds.has(player.id))
+      .map((player) => player.name),
+    [activeSelectedPlayerIds, sortedPlayers],
+  );
 
   const displayName = (member: AssignedMember) =>
     nameMode === "character" ? member.characterName : member.playerName;
+
+  const togglePlayerSelection = (playerId: string) => {
+    setSelectedPlayerIds((current) => {
+      const next = new Set(current);
+      if (next.has(playerId)) next.delete(playerId);
+      else next.add(playerId);
+      return next;
+    });
+  };
 
   const handleToggleComplete = (group: RaidGroup, completed: boolean) => {
     if (!completed) {
@@ -194,8 +240,8 @@ export default function PartyPanel({
           className="party-view-control"
           value={viewMode}
           items={[
-            { value: "raid", label: "레이드별" },
             { value: "member", label: "멤버별" },
+            { value: "raid", label: "레이드별" },
           ]}
           onChange={(value) => setViewMode(value as ViewMode)}
         />
@@ -210,6 +256,24 @@ export default function PartyPanel({
         />
       </div>
 
+      {viewMode === "member" && plan ? (
+        <MemberFilterBar
+          players={sortedPlayers}
+          selectedPlayerIds={activeSelectedPlayerIds}
+          selectedPlayerNames={selectedPlayerNames}
+          resultCount={selectedMemberGroups.length}
+          onToggle={togglePlayerSelection}
+        />
+      ) : null}
+
+      {viewMode === "raid" && raidFamilyTabs.length ? (
+        <RaidFamilyTabs
+          items={raidFamilyTabs}
+          value={activeRaidFamily}
+          onChange={setSelectedRaidFamily}
+        />
+      ) : null}
+
       <p className="party-help">캐릭터를 드래그해 같은 레이드 계열의 다른 파티로 옮길 수 있어요. 대상 파티에 같은 플레이어의 캐릭터가 있으면 두 캐릭터를 맞교환합니다.</p>
       {stale ? <div className="party-warning">멤버 정보가 변경되었습니다. 자동구성하면 현재 수동 배치를 유지하며 다시 충원합니다.</div> : null}
       {plan?.warnings.length ? (
@@ -222,60 +286,54 @@ export default function PartyPanel({
           <span>멤버 목록에서 레이드를 선택한 뒤 자동구성을 눌러 주세요.</span>
         </div>
       ) : viewMode === "raid" ? (
-        <div className="party-family-list">
-          {Array.from(groupsByFamily.entries()).map(([family, familyGroups]) => (
-            <RaidFamilySection
-              key={family}
-              family={family}
-              groups={familyGroups}
-              completedPartyIds={completedPartyIds}
-              departingPartyIds={departingPartyIds}
-              displayName={displayName}
-              dragging={dragging}
-              onDragStart={setDragging}
-              onDragEnd={() => setDragging(null)}
-              onDrop={(targetGroupId) => {
-                if (dragging) onMove(dragging.memberId, dragging.groupId, targetGroupId);
-                setDragging(null);
-              }}
-              onOpenSwap={(group, member) => setSwapState({ group, member })}
-              onOpenAdd={(group, role) => setAddState({ group, role })}
-              onToggleComplete={handleToggleComplete}
-            />
-          ))}
-        </div>
+        <section
+          className="party-results-section"
+          role="tabpanel"
+          id="party-raid-family-panel"
+          aria-labelledby={raidFamilyTabs.find((item) => item.family === activeRaidFamily)?.tabId}
+        >
+          <PartyGroupGrid
+            groups={groupsByFamily.get(activeRaidFamily) ?? []}
+            allGroups={groups}
+            completedPartyIds={completedPartyIds}
+            departingPartyIds={departingPartyIds}
+            displayName={displayName}
+            dragging={dragging}
+            onDragStart={setDragging}
+            onDragEnd={() => setDragging(null)}
+            onDrop={(targetGroupId) => {
+              if (dragging) onMove(dragging.memberId, dragging.groupId, targetGroupId);
+              setDragging(null);
+            }}
+            onOpenSwap={(group, member) => setSwapState({ group, member })}
+            onOpenAdd={(group, role) => setAddState({ group, role })}
+            onToggleComplete={handleToggleComplete}
+          />
+        </section>
+      ) : selectedMemberGroups.length ? (
+        <section className="party-results-section" aria-live="polite">
+          <PartyGroupGrid
+            groups={selectedMemberGroups}
+            allGroups={groups}
+            completedPartyIds={completedPartyIds}
+            departingPartyIds={departingPartyIds}
+            displayName={displayName}
+            dragging={dragging}
+            onDragStart={setDragging}
+            onDragEnd={() => setDragging(null)}
+            onDrop={(targetGroupId) => {
+              if (dragging) onMove(dragging.memberId, dragging.groupId, targetGroupId);
+              setDragging(null);
+            }}
+            onOpenSwap={(group, member) => setSwapState({ group, member })}
+            onOpenAdd={(group, role) => setAddState({ group, role })}
+            onToggleComplete={handleToggleComplete}
+          />
+        </section>
       ) : (
-        <div className="party-member-list">
-          {sortedPlayers.map((player) => {
-            const playerGroups = visibleGroups
-              .filter((group) =>
-                group.members.some((member) => member.playerId === player.id),
-              )
-              .sort((a, b) => b.members.length - a.members.length);
-            if (!playerGroups.length) return null;
-            return (
-              <MemberPartySection
-                key={player.id}
-                playerName={player.name}
-                favorite={player.id === favoritePlayerId}
-                groups={playerGroups}
-                allGroups={groups}
-                completedPartyIds={completedPartyIds}
-                departingPartyIds={departingPartyIds}
-                displayName={displayName}
-                dragging={dragging}
-                onDragStart={setDragging}
-                onDragEnd={() => setDragging(null)}
-                onDrop={(targetGroupId) => {
-                  if (dragging) onMove(dragging.memberId, dragging.groupId, targetGroupId);
-                  setDragging(null);
-                }}
-                onOpenSwap={(group, member) => setSwapState({ group, member })}
-                onOpenAdd={(group, role) => setAddState({ group, role })}
-                onToggleComplete={handleToggleComplete}
-              />
-            );
-          })}
+        <div className="party-empty party-filter-empty" aria-live="polite">
+          <strong>선택한 멤버 조건의 파티가 없습니다.</strong>
+          <span>멤버 선택을 바꾸거나 모두 해제해 전체 파티를 확인해 주세요.</span>
         </div>
       )}
 
@@ -327,51 +385,97 @@ function SegmentedControl({ value, items, onChange, className = "" }: {
   );
 }
 
-function RaidFamilySection({ family, groups, completedPartyIds, departingPartyIds, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
-  family: string;
-  groups: RaidGroup[];
-  completedPartyIds: Set<string>;
-  departingPartyIds: Set<string>;
-  displayName: (member: AssignedMember) => string;
-  dragging: { memberId: string; groupId: string } | null;
-  onDragStart: (value: { memberId: string; groupId: string }) => void;
-  onDragEnd: () => void;
-  onDrop: (groupId: string) => void;
-  onOpenSwap: (group: RaidGroup, member: AssignedMember) => void;
-  onOpenAdd: (group: RaidGroup, role: AssignedMember["role"]) => void;
-  onToggleComplete: (group: RaidGroup, completed: boolean) => void;
+function MemberFilterBar({ players, selectedPlayerIds, selectedPlayerNames, resultCount, onToggle }: {
+  players: Player[];
+  selectedPlayerIds: ReadonlySet<string>;
+  selectedPlayerNames: string[];
+  resultCount: number;
+  onToggle: (playerId: string) => void;
 }) {
+  const resultSummary = selectedPlayerNames.length === 1
+    ? `${selectedPlayerNames[0]} 포함 · ${resultCount}개 파티`
+    : selectedPlayerNames.length > 1
+      ? `${selectedPlayerNames.join(" + ")}만 포함 · ${resultCount}개 파티`
+      : `모든 멤버 조합 · ${resultCount}개 파티`;
+
   return (
-    <section className="party-family-section">
-      <header>
-        <div><h3>{family}</h3></div>
-      </header>
-      <div className="party-card-row">
-        {groups.map((group) => (
-          <PartyCard
-            key={group.id}
-            group={group}
-            groupIndex={groups.filter((candidate) => candidate.raidName === group.raidName).findIndex((candidate) => candidate.id === group.id) + 1}
-            completed={completedPartyIds.has(group.id)}
-            departing={departingPartyIds.has(group.id)}
-            displayName={displayName}
-            dragging={dragging}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-            onDrop={() => onDrop(group.id)}
-            onOpenSwap={onOpenSwap}
-            onOpenAdd={onOpenAdd}
-            onToggleComplete={onToggleComplete}
-          />
-        ))}
+    <section className="party-member-filter" aria-labelledby="party-member-filter-title">
+      <div className="party-filter-meta">
+        <strong id="party-member-filter-title">멤버 조합</strong>
+        <span>{resultSummary}</span>
+      </div>
+      <div className="party-member-chip-row" role="group" aria-label="파티 멤버 조합 선택">
+        {players.map((player) => {
+          const selected = selectedPlayerIds.has(player.id);
+          return (
+            <button
+              className={`party-member-chip${selected ? " active" : ""}`}
+              key={player.id}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onToggle(player.id)}
+            >
+              <span>{player.name}</span>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
 }
 
-function MemberPartySection({ playerName, favorite, groups, allGroups, completedPartyIds, departingPartyIds, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
-  playerName: string;
-  favorite: boolean;
+function RaidFamilyTabs({ items, value, onChange }: {
+  items: Array<{ family: string; tabId: string }>;
+  value: string;
+  onChange: (family: string) => void;
+}) {
+  const moveSelection = (currentIndex: number, nextIndex: number) => {
+    const next = items[nextIndex];
+    if (!next) return;
+    onChange(next.family);
+    window.requestAnimationFrame(() => document.getElementById(next.tabId)?.focus());
+  };
+
+  return (
+    <div className="party-raid-tabs" role="tablist" aria-label="레이드 계열">
+      {items.map((item, index) => {
+        const selected = item.family === value;
+        return (
+          <button
+            className={selected ? "active" : ""}
+            id={item.tabId}
+            key={item.family}
+            type="button"
+            role="tab"
+            tabIndex={selected ? 0 : -1}
+            aria-selected={selected}
+            aria-controls="party-raid-family-panel"
+            onClick={() => onChange(item.family)}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowRight") {
+                event.preventDefault();
+                moveSelection(index, (index + 1) % items.length);
+              } else if (event.key === "ArrowLeft") {
+                event.preventDefault();
+                moveSelection(index, (index - 1 + items.length) % items.length);
+              } else if (event.key === "Home") {
+                event.preventDefault();
+                moveSelection(index, 0);
+              } else if (event.key === "End") {
+                event.preventDefault();
+                moveSelection(index, items.length - 1);
+              }
+            }}
+          >
+            {item.family}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PartyGroupGrid({ groups, allGroups, completedPartyIds, departingPartyIds, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
   groups: RaidGroup[];
   allGroups: RaidGroup[];
   completedPartyIds: Set<string>;
@@ -386,30 +490,25 @@ function MemberPartySection({ playerName, favorite, groups, allGroups, completed
   onToggleComplete: (group: RaidGroup, completed: boolean) => void;
 }) {
   return (
-    <section className="party-member-section">
-      <header>
-        <h3>{favorite ? <PartyIcon name="star" /> : null}{playerName}</h3>
-      </header>
-      <div className="party-card-row">
-        {groups.map((group) => (
-          <PartyCard
-            key={group.id}
-            group={group}
-            groupIndex={allGroups.filter((candidate) => candidate.raidName === group.raidName).findIndex((candidate) => candidate.id === group.id) + 1}
-            completed={completedPartyIds.has(group.id)}
-            departing={departingPartyIds.has(group.id)}
-            displayName={displayName}
-            dragging={dragging}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd}
-            onDrop={() => onDrop(group.id)}
-            onOpenSwap={onOpenSwap}
-            onOpenAdd={onOpenAdd}
-            onToggleComplete={onToggleComplete}
-          />
-        ))}
-      </div>
-    </section>
+    <div className="party-card-row">
+      {groups.map((group) => (
+        <PartyCard
+          key={group.id}
+          group={group}
+          groupIndex={allGroups.filter((candidate) => candidate.raidName === group.raidName).findIndex((candidate) => candidate.id === group.id) + 1}
+          completed={completedPartyIds.has(group.id)}
+          departing={departingPartyIds.has(group.id)}
+          displayName={displayName}
+          dragging={dragging}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onDrop={() => onDrop(group.id)}
+          onOpenSwap={onOpenSwap}
+          onOpenAdd={onOpenAdd}
+          onToggleComplete={onToggleComplete}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -599,7 +698,7 @@ function SwapModal({ state, groups, players, raidWeek, onClose, onSelect }: {
   );
 }
 
-const formatItemLevel = (value: number) => value.toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const formatItemLevel = (value: number) => Math.trunc(value).toLocaleString("ko-KR");
 
 const orderCompletedGroups = (groups: RaidGroup[], completedPartyIds: Set<string>) =>
   groups

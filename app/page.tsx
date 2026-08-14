@@ -934,7 +934,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white text-[#151923]">
-      <div className="workspace-shell mx-auto flex max-w-[1400px] flex-col gap-5 px-6 py-5">
+      <div className="workspace-shell mx-auto flex max-w-[1280px] flex-col gap-5 px-6 py-5">
         <header className="app-header">
           <div className="room-identity">
             <div className="room-title-row">
