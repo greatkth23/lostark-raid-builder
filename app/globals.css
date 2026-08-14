@@ -341,7 +341,7 @@
 .party-empty-slot {
   display: grid;
   min-height: 27px;
-  grid-template-columns: 32px minmax(0, 1fr) 87px 44px 60px 18px;
+  grid-template-columns: 32px minmax(0, 1fr) 89px 44px 60px 18px;
   align-items: center;
   gap: 3px;
   border-bottom: 0;
