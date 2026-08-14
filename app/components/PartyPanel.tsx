@@ -491,10 +491,61 @@ function PartyGroupGrid({ groups, allGroups, masonry, completedPartyIds, departi
   onOpenAdd: (group: RaidGroup, role: AssignedMember["role"]) => void;
   onToggleComplete: (group: RaidGroup, completed: boolean) => void;
 }) {
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const row = rowRef.current;
+    if (!masonry || !row || typeof ResizeObserver === "undefined") return;
+
+    let animationFrameId = 0;
+    const layoutItems = () => {
+      animationFrameId = 0;
+      const styles = window.getComputedStyle(row);
+      const columnCount = Math.max(
+        1,
+        Number.parseInt(styles.getPropertyValue("--party-column-count"), 10) || 1,
+      );
+      const gap = Number.parseFloat(styles.getPropertyValue("--party-card-gap")) || 0;
+      const rowSize = Number.parseFloat(styles.getPropertyValue("--party-row-size")) || 1;
+      const nextRowByColumn = Array.from({ length: columnCount }, () => 1);
+      const items = row.querySelectorAll<HTMLElement>(".party-card-masonry-item");
+
+      items.forEach((item, index) => {
+        const card = item.firstElementChild as HTMLElement | null;
+        if (!card) return;
+        const columnIndex = index % columnCount;
+        const rowSpan = Math.max(
+          1,
+          Math.ceil((card.getBoundingClientRect().height + gap) / rowSize),
+        );
+        const rowStart = nextRowByColumn[columnIndex];
+        item.style.gridColumn = String(columnIndex + 1);
+        item.style.gridRow = `${rowStart} / span ${rowSpan}`;
+        nextRowByColumn[columnIndex] = rowStart + rowSpan;
+      });
+    };
+    const scheduleLayout = () => {
+      window.cancelAnimationFrame(animationFrameId);
+      animationFrameId = window.requestAnimationFrame(layoutItems);
+    };
+    const resizeObserver = new ResizeObserver(scheduleLayout);
+
+    row.querySelectorAll<HTMLElement>(".party-card-masonry-item > .party-card")
+      .forEach((card) => resizeObserver.observe(card));
+    window.addEventListener("resize", scheduleLayout);
+    scheduleLayout();
+
+    return () => {
+      window.cancelAnimationFrame(animationFrameId);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", scheduleLayout);
+    };
+  }, [groups, masonry]);
+
   return (
-    <div className={`party-card-row${masonry ? " masonry" : ""}`}>
-      {groups.map((group) => (
-        <PartyCard
+    <div ref={rowRef} className={`party-card-row${masonry ? " masonry" : ""}`}>
+      {groups.map((group) => {
+        const card = <PartyCard
           key={group.id}
           group={group}
           groupIndex={allGroups.filter((candidate) => candidate.raidName === group.raidName).findIndex((candidate) => candidate.id === group.id) + 1}
@@ -508,8 +559,11 @@ function PartyGroupGrid({ groups, allGroups, masonry, completedPartyIds, departi
           onOpenSwap={onOpenSwap}
           onOpenAdd={onOpenAdd}
           onToggleComplete={onToggleComplete}
-        />
-      ))}
+        />;
+        return masonry
+          ? <div className="party-card-masonry-item" key={group.id}>{card}</div>
+          : card;
+      })}
     </div>
   );
 }
