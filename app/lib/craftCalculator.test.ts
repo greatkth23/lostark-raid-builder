@@ -204,6 +204,56 @@ describe("craft calculator", () => {
     ).toBe(true);
   });
 
+  it.each([
+    ["archaeology", "archaeologyRare", "archaeologyAdvanced", "archaeologyCommon", "희귀한 유물 → 고대 유물"],
+    ["foraging", "foragingRare", "foragingAdvanced", "foragingCommon", "수줍은 들꽃 → 들꽃"],
+    ["hunting", "huntingRare", "huntingAdvanced", "huntingCommon", "다듬은 생고기 → 두툼한 생고기"],
+    ["fishing", "fishingRare", "fishingAdvanced", "fishingCommon", "붉은 살 생선 → 생선"],
+  ] as const)(
+    "%s does not exchange advanced materials for common materials",
+    (lifeKey, rareKey, advancedKey, commonKey, exchangeLabel) => {
+      const result = calculateCraftResults(
+        "abidos",
+        { ...DEFAULT_CRAFT_SETTINGS, setCount: 1 },
+        makeQuotes({
+          [rareKey]: { currentMinPrice: 1 },
+          [advancedKey]: { currentMinPrice: 1 },
+          [commonKey]: { currentMinPrice: 1_000 },
+        }),
+      ).find((item) => item.lifeKey === lifeKey);
+
+      expect(
+        result?.exchangeSteps.some((step) => step.label === exchangeLabel),
+      ).toBe(false);
+      expect(
+        result?.acquisitionLines.some((line) => line.key === commonKey),
+      ).toBe(true);
+    },
+  );
+
+  it.each([
+    ["logging", "loggingRare", "loggingAdvanced", "loggingCommon", "loggingSpecial", "부드러운 목재 → 목재"],
+    ["mining", "miningRare", "miningAdvanced", "miningCommon", "miningSpecial", "묵직한 철광석 → 철광석"],
+  ] as const)(
+    "%s still exchanges advanced materials for common materials",
+    (lifeKey, rareKey, advancedKey, commonKey, specialKey, exchangeLabel) => {
+      const result = calculateCraftResults(
+        "abidos",
+        { ...DEFAULT_CRAFT_SETTINGS, setCount: 1 },
+        makeQuotes({
+          [rareKey]: { currentMinPrice: 1 },
+          [advancedKey]: { currentMinPrice: 1 },
+          [commonKey]: { currentMinPrice: 1_000 },
+          [specialKey]: { currentMinPrice: 1_000 },
+        }),
+      ).find((item) => item.lifeKey === lifeKey);
+
+      expect(
+        result?.exchangeSteps.some((step) => step.label === exchangeLabel),
+      ).toBe(true);
+    },
+  );
+
   it("prefers the cheapest equivalent route even when bundle rounding leaves more material", () => {
     const quotes = makeQuotes({
       loggingRare: { bundleCount: 100, currentMinPrice: 1_695 },

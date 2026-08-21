@@ -174,11 +174,13 @@ function findCheapestCommonSource(
       kind: "direct",
       unitCost: getSourceUnitCost(life.common, quotes, sourceMode),
     },
-    {
+  ];
+  if (life.canExchangeAdvancedForCommon) {
+    candidates.push({
       kind: "advanced",
       unitCost: getSourceUnitCost(life.advanced, quotes, sourceMode) / 2,
-    },
-  ];
+    });
+  }
   if (life.special) {
     candidates.push({
       kind: "special",

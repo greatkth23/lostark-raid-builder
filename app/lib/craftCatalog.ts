@@ -36,6 +36,7 @@ export type LifeDefinition = {
   rare: MarketItemKey;
   advanced: MarketItemKey;
   common: MarketItemKey;
+  canExchangeAdvancedForCommon?: boolean;
   special?: MarketItemKey;
 };
 
@@ -55,6 +56,7 @@ export const LIFE_DEFINITIONS: readonly LifeDefinition[] = [
     rare: "loggingRare",
     advanced: "loggingAdvanced",
     common: "loggingCommon",
+    canExchangeAdvancedForCommon: true,
     special: "loggingSpecial",
   },
   {
@@ -64,6 +66,7 @@ export const LIFE_DEFINITIONS: readonly LifeDefinition[] = [
     rare: "miningRare",
     advanced: "miningAdvanced",
     common: "miningCommon",
+    canExchangeAdvancedForCommon: true,
     special: "miningSpecial",
   },
   {
