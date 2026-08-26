@@ -4,3 +4,5 @@ UI icons are from [coolicons](https://github.com/krystonschwarze/coolicons) by K
 
 `star-filled.svg` uses the Coolicons Star geometry with a filled active state.
 
+`chart-pie.svg` is the Coolicons `Chart_Pie` icon.
+

@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/raid", label: "공격대", icon: "/icons/users.svg", kind: "raid" },
   { href: "/craft", label: "제작", icon: "/icons/puzzle.svg", kind: "craft" },
+  { href: "/auction", label: "경매", icon: "/icons/chart-pie.svg", kind: "auction" },
 ] as const;
 
 export default function GlobalHeader() {
@@ -29,7 +30,7 @@ export default function GlobalHeader() {
             const active =
               item.kind === "raid"
                 ? pathname === "/" || pathname.startsWith("/raid")
-                : pathname.startsWith("/craft");
+                : pathname.startsWith(item.href);
 
             return (
               <Link
