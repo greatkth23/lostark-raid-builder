@@ -4314,8 +4314,8 @@ button:not(:disabled) {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid #e5ebf3;
-  padding: 0 0 14px;
+  border-bottom: 0;
+  padding: 0 0 8px;
 }
 
 .expedition-head > div:first-child {
@@ -4349,7 +4349,7 @@ button:not(:disabled) {
   align-items: stretch;
   justify-content: start;
   gap: 16px;
-  padding: 16px 0 0;
+  padding: 8px 0 0;
 }
 
 .integrated-character-card {
@@ -4590,13 +4590,13 @@ button:not(:disabled) {
   }
 
   .expedition-head {
-    padding: 0 0 12px;
+    padding: 0 0 6px;
   }
 
   .integrated-character-grid {
     display: grid;
     gap: 12px;
-    padding: 12px 0 0;
+    padding: 6px 0 0;
   }
 
   .integrated-character-card {
