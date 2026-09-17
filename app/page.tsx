@@ -588,7 +588,7 @@ export default function Home() {
     if (!character) return;
     requestConfirmation({
       title: "캐릭터 삭제",
-      description: `“${character.name || "캐릭터"}” 캐릭터를 삭제할까요?${character.name.trim() ? " 삭제 후 원정대의 복원 목록에서 되돌릴 수 있습니다." : ""}`,
+      description: `“${character.name || "캐릭터"}” 캐릭터를 삭제할까요?`,
       confirmLabel: "삭제",
       tone: "danger",
       onConfirm: () => commitOperation({
@@ -866,7 +866,7 @@ export default function Home() {
     return payload.characters ?? [];
   };
 
-  const syncRoster = async (playerId: string, expeditionId: string) => {
+  const syncRoster = async (playerId: string, expeditionId: string, representativeName?: string) => {
     const player = players.find((candidate) => candidate.id === playerId);
     const expedition = player?.expeditions.find(
       (candidate) => candidate.id === expeditionId,
@@ -876,7 +876,10 @@ export default function Home() {
       return;
     }
 
-    if (!expedition.representativeName.trim()) {
+    const expeditionToSync = representativeName === undefined
+      ? expedition
+      : { ...expedition, representativeName };
+    if (!expeditionToSync.representativeName.trim()) {
       setNotice("대표 캐릭터명을 입력하세요.");
       return;
     }
@@ -886,11 +889,11 @@ export default function Home() {
     setNotice("");
 
     try {
-      const roster = await fetchRoster(expedition.representativeName);
+      const roster = await fetchRoster(expeditionToSync.representativeName);
       commitOperation({
         type: "expedition.replace",
         playerId,
-        expedition: mergeRosterIntoExpedition(expedition, roster),
+        expedition: mergeRosterIntoExpedition(expeditionToSync, roster),
       });
       setGeneratedPlan(null);
       setGeneratedFingerprint("");
@@ -1930,7 +1933,7 @@ function PlayerEditor({
     expeditionId: string,
     patch: Partial<Expedition>,
   ) => void;
-  onSyncRoster: (playerId: string, expeditionId: string) => void;
+  onSyncRoster: (playerId: string, expeditionId: string, representativeName?: string) => void;
   onSyncAll: () => void;
   onResetAllRaids: () => void;
   onRestoreCharacter: (
@@ -2117,9 +2120,10 @@ function PlayerEditor({
             aria-label="동기화"
             title="동기화"
             onClick={onSyncAll}
+            disabled={Boolean(syncingId)}
           >
             <CoolIcon name="refresh" />
-            <span className="member-action-label">동기화</span>
+            <span className="member-action-label">{syncingId ? "동기화 중" : "동기화"}</span>
           </button>
           <button
             className="ghost-button"
@@ -2202,20 +2206,18 @@ function PlayerEditor({
             {activePlayer.expeditions.map((expedition) => (
               <ExpeditionBlock
                 expedition={expedition}
-                isSyncing={
-                  syncingId === `${activePlayer.id}:${expedition.id}`
-                }
                 key={expedition.id}
                 player={activePlayer}
                 raidWeek={raidWeek}
                 onRestoreCharacter={onRestoreCharacter}
-                onRemoveCharacter={onRemoveCharacter}
                 onRemoveExpedition={onRemoveExpedition}
                 onSetRole={onSetRole}
                 onSetGoldPreference={onSetGoldPreference}
                 onSetCompletion={onSetCompletion}
-                onSyncRoster={onSyncRoster}
                 onToggleRaid={onToggleRaid}
+                onToggleCollapsed={() => onUpdateExpedition(activePlayer.id, expedition.id, {
+                  charactersHidden: !expedition.charactersHidden,
+                })}
                 onOpenSettings={() =>
                   setSettingsTarget({
                     playerId: activePlayer.id,
@@ -2299,11 +2301,13 @@ function PlayerEditor({
 
       {settingsPlayer && settingsExpedition ? (
         <ExpeditionSettingsModal
+          key={settingsExpedition.id}
           expedition={settingsExpedition}
           player={settingsPlayer}
           onClose={() => setSettingsTarget(null)}
           onSyncRoster={onSyncRoster}
           onUpdateExpedition={onUpdateExpedition}
+          onRemoveCharacter={onRemoveCharacter}
         />
       ) : null}
     </section>
@@ -2315,10 +2319,8 @@ function ExpeditionBlock({
   expedition,
   raidWeek,
   isEditingName,
-  isSyncing,
   nameDraft,
   onRestoreCharacter,
-  onRemoveCharacter,
   onRemoveExpedition,
   onSetRole,
   onSetGoldPreference,
@@ -2327,24 +2329,18 @@ function ExpeditionBlock({
   onChangeNameDraft,
   onStartEditName,
   onStopEditName,
-  onSyncRoster,
+  onToggleCollapsed,
   onToggleRaid,
 }: {
   player: Player;
   expedition: Expedition;
   raidWeek: string;
   isEditingName: boolean;
-  isSyncing: boolean;
   nameDraft: string;
   onRestoreCharacter: (
     playerId: string,
     expeditionId: string,
     characterName: string,
-  ) => void;
-  onRemoveCharacter: (
-    playerId: string,
-    expeditionId: string,
-    characterId: string,
   ) => void;
   onRemoveExpedition: (playerId: string, expeditionId: string) => void;
   onSetRole: (
@@ -2370,7 +2366,7 @@ function ExpeditionBlock({
   onChangeNameDraft: (value: string) => void;
   onStartEditName: () => void;
   onStopEditName: (value: string) => void;
-  onSyncRoster: (playerId: string, expeditionId: string) => void;
+  onToggleCollapsed: () => void;
   onToggleRaid: (
     playerId: string,
     expeditionId: string,
@@ -2380,13 +2376,20 @@ function ExpeditionBlock({
   ) => void;
 }) {
   const [restoreOpen, setRestoreOpen] = useState(false);
+  const [contentUnclipped, setContentUnclipped] = useState(!expedition.charactersHidden);
+  useEffect(() => {
+    // Keep menus visible after opening, but clip the content during the slide.
+    const timer = window.setTimeout(() => setContentUnclipped(!expedition.charactersHidden),
+      expedition.charactersHidden ? 0 : 280);
+    return () => window.clearTimeout(timer);
+  }, [expedition.charactersHidden]);
   const restorableCharacters = getRestorableCharacters(expedition);
   const needsRepresentativeSetup =
     !expedition.representativeName.trim() && expedition.characters.length === 0;
   const goldProgress = getExpeditionTradableGoldProgress(expedition, raidWeek);
 
   return (
-    <section className="expedition-block">
+    <section className={`expedition-block${expedition.charactersHidden ? " is-collapsed" : ""}`}>
       <div className="expedition-head">
         <div>
           <div className="expedition-title-line">
@@ -2439,85 +2442,84 @@ function ExpeditionBlock({
             </span>
           </div>
         </div>
-        <div className="expedition-actions">
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={() => onSyncRoster(player.id, expedition.id)}
-            disabled={isSyncing}
-          >
-            <CoolIcon name="refresh" /> {isSyncing ? "동기화 중" : "동기화"}
-          </button>
-          <button
-            className="ghost-button"
-            type="button"
-            onClick={onOpenSettings}
-          >
-            <CoolIcon name="settings" /> 원정대 설정
-          </button>
-          <button
-            className="danger-text-button"
-            type="button"
-            onClick={() => onRemoveExpedition(player.id, expedition.id)}
-          >
-            <CoolIcon name="trash" /> 삭제
-          </button>
-        </div>
+        <button
+          className="expedition-disclosure-button"
+          type="button"
+          aria-label={`${expedition.name} ${expedition.charactersHidden ? "펼치기" : "접기"}`}
+          aria-expanded={!expedition.charactersHidden}
+          aria-controls={`expedition-body-${expedition.id}`}
+          onClick={onToggleCollapsed}
+        >
+          <CoolIcon name="chevron" />
+        </button>
       </div>
 
       <div
+        id={`expedition-body-${expedition.id}`}
         className={`expedition-collapsible ${expedition.charactersHidden ? "collapsed" : "expanded"}`}
         aria-hidden={expedition.charactersHidden}
+        inert={expedition.charactersHidden}
       >
-        <div className="integrated-character-grid">
-          {expedition.characters.map((character) => (
-            <IntegratedCharacterCard
-              character={character}
-              expedition={expedition}
-              key={character.id}
-              player={player}
-              raidWeek={raidWeek}
-              onRemoveCharacter={onRemoveCharacter}
-              onSetRole={onSetRole}
-              onSetGoldPreference={onSetGoldPreference}
-              onSetCompletion={onSetCompletion}
-              onToggleRaid={onToggleRaid}
-            />
-          ))}
-          <div className="restore-character-control">
-            <button
-              className="add-raid-button"
-              type="button"
-              onClick={() => {
-                if (needsRepresentativeSetup) {
-                  onOpenSettings();
-                  return;
+        <div className={`expedition-collapsible-content${contentUnclipped && !expedition.charactersHidden ? " unclipped" : ""}`}>
+          <div className="integrated-character-grid">
+            {expedition.characters.map((character) => (
+              <IntegratedCharacterCard
+                character={character}
+                expedition={expedition}
+                key={character.id}
+                player={player}
+                raidWeek={raidWeek}
+                onSetRole={onSetRole}
+                onSetGoldPreference={onSetGoldPreference}
+                onSetCompletion={onSetCompletion}
+                onToggleRaid={onToggleRaid}
+              />
+            ))}
+          </div>
+          <div className="expedition-footer">
+            <div className="restore-character-control">
+              <button
+                className="add-raid-button"
+                type="button"
+                onClick={() => {
+                  if (needsRepresentativeSetup) {
+                    onOpenSettings();
+                    return;
+                  }
+                  setRestoreOpen((current) => !current);
+                }}
+                disabled={
+                  !needsRepresentativeSetup && !restorableCharacters.length
                 }
-                setRestoreOpen((current) => !current);
-              }}
-              disabled={
-                !needsRepresentativeSetup && !restorableCharacters.length
-              }
-            >
-              <CoolIcon name="add" /> 캐릭터 추가
-            </button>
-            {restoreOpen && restorableCharacters.length ? (
-              <div className="restore-character-menu">
-                {restorableCharacters.map((character) => (
-                  <button
-                    key={character.name}
-                    type="button"
-                    onClick={() => {
-                      onRestoreCharacter(player.id, expedition.id, character.name);
-                      setRestoreOpen(false);
-                    }}
-                  >
-                    <strong>{character.name}</strong>
-                    {character.className ? <span>{character.className}</span> : null}
-                  </button>
-                ))}
-              </div>
-            ) : null}
+              >
+                <CoolIcon name="add" /> 캐릭터 추가
+              </button>
+              {restoreOpen && restorableCharacters.length ? (
+                <div className="restore-character-menu">
+                  {restorableCharacters.map((character) => (
+                    <button
+                      key={character.name}
+                      type="button"
+                      onClick={() => {
+                        onRestoreCharacter(player.id, expedition.id, character.name);
+                        setRestoreOpen(false);
+                      }}
+                    >
+                      <strong>{character.name}</strong>
+                      {character.className ? <span>{character.className}</span> : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <div className="expedition-actions">
+              <button className="ghost-button" type="button" onClick={onOpenSettings}>
+                <CoolIcon name="settings" /> 원정대 설정
+              </button>
+              <button className="danger-text-button" type="button" onClick={() => onRemoveExpedition(player.id, expedition.id)}>
+                <CoolIcon name="trash" /> 삭제
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -2531,27 +2533,36 @@ function ExpeditionSettingsModal({
   onClose,
   onSyncRoster,
   onUpdateExpedition,
+  onRemoveCharacter,
 }: {
   player: Player;
   expedition: Expedition;
   onClose: () => void;
-  onSyncRoster: (playerId: string, expeditionId: string) => void;
+  onSyncRoster: (playerId: string, expeditionId: string, representativeName?: string) => void;
+  onRemoveCharacter: (playerId: string, expeditionId: string, characterId: string) => void;
   onUpdateExpedition: (
     playerId: string,
     expeditionId: string,
     patch: Partial<Expedition>,
   ) => void;
 }) {
+  const initialRepresentativeName = useRef(expedition.representativeName.trim());
+  const [representativeName, setRepresentativeName] = useState(expedition.representativeName);
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const nextName = representativeName.trim();
+    const nameChanged = nextName !== initialRepresentativeName.current;
+    if (nameChanged) {
+      onUpdateExpedition(player.id, expedition.id, { representativeName: nextName });
+    }
     onClose();
-    onSyncRoster(player.id, expedition.id);
+    if (nameChanged && nextName) onSyncRoster(player.id, expedition.id, nextName);
   };
 
   return (
     <div className="settings-modal-backdrop">
       <form
-        className="settings-modal"
+        className="settings-modal expedition-settings-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="expedition-settings-title"
@@ -2576,38 +2587,36 @@ function ExpeditionSettingsModal({
           <span>대표 캐릭터</span>
           <input
             className="settings-input"
-            value={expedition.representativeName}
+            value={representativeName}
             placeholder="대표 캐릭터명 입력"
-            onChange={(event) =>
-              onUpdateExpedition(player.id, expedition.id, {
-                representativeName: event.target.value,
-              })
-            }
+            maxLength={80}
+            onChange={(event) => setRepresentativeName(event.target.value)}
           />
         </label>
 
-        <div className="settings-toggle-row">
-          <div>
-            <strong>원정대 숨김</strong>
-            <span>
-              {expedition.charactersHidden
-                ? "캐릭터 목록을 숨기는 중"
-                : "캐릭터 목록을 표시하는 중"}
-            </span>
-          </div>
-          <button
-            className={`settings-switch ${expedition.charactersHidden ? "on" : ""}`}
-            type="button"
-            aria-pressed={expedition.charactersHidden}
-            onClick={() =>
-              onUpdateExpedition(player.id, expedition.id, {
-                charactersHidden: !expedition.charactersHidden,
-              })
-            }
-          >
-            <span />
-          </button>
-        </div>
+        <section className="expedition-settings-characters" aria-labelledby="expedition-characters-title">
+          <h3 id="expedition-characters-title">캐릭터 관리</h3>
+          {expedition.characters.length ? (
+            <ul>
+              {expedition.characters.map((character) => (
+                <li key={character.id}>
+                  <div>
+                    <strong>{character.name || "캐릭터"}</strong>
+                    <span>{character.className || "직업 없음"} · 레벨 {formatItemLevel(character.itemLevel)}</span>
+                  </div>
+                  <button
+                    className="danger-text-button"
+                    type="button"
+                    aria-label={`${character.name || "캐릭터"} 삭제`}
+                    onClick={() => onRemoveCharacter(player.id, expedition.id, character.id)}
+                  >
+                    <CoolIcon name="trash" /> 삭제
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : <p>등록된 캐릭터가 없습니다.</p>}
+        </section>
 
         <div className="settings-modal-actions">
           <button
@@ -2749,7 +2758,6 @@ function IntegratedCharacterCard({
   expedition,
   character,
   raidWeek,
-  onRemoveCharacter,
   onSetRole,
   onSetGoldPreference,
   onSetCompletion,
@@ -2759,11 +2767,6 @@ function IntegratedCharacterCard({
   expedition: Expedition;
   character: Character;
   raidWeek: string;
-  onRemoveCharacter: (
-    playerId: string,
-    expeditionId: string,
-    characterId: string,
-  ) => void;
   onSetRole: (
     playerId: string,
     expeditionId: string,
@@ -2871,14 +2874,6 @@ function IntegratedCharacterCard({
             ) : null}
           </div>
         </div>
-        <button
-          className="integrated-character-delete"
-          type="button"
-          aria-label={`${character.name || "캐릭터"} 삭제`}
-          onClick={() => onRemoveCharacter(player.id, expedition.id, character.id)}
-        >
-          <CoolIcon name="trash" />
-        </button>
       </header>
 
       <div className="integrated-character-meta">
