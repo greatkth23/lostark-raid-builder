@@ -10,6 +10,7 @@ import {
 import type { CSSProperties } from "react";
 import lostarkGoldIcon from "../lostark_gold.png";
 import PartyPanel from "./components/PartyPanel";
+import LopecCharacterLink from "./components/LopecCharacterLink";
 import {
   RAID_DEFINITIONS,
   SUPPORT_CLASS_NAMES,
@@ -2515,7 +2516,9 @@ function ExpeditionSettingsModal({
                 {expedition.characters.map((character) => (
                   <li key={character.id}>
                     <div>
-                      <strong>{character.name || "캐릭터"}</strong>
+                      <strong>
+                        <LopecCharacterLink name={character.name} fallback="캐릭터" />
+                      </strong>
                       <span>{character.className || "직업 없음"} · Lv. {formatItemLevel(character.itemLevel)}</span>
                     </div>
                     <button
@@ -2821,7 +2824,9 @@ function IntegratedCharacterCard({
           <div className="integrated-character-name-row">
             <span className="integrated-character-title">
               <CoolIcon name={character.role === "support" ? "support" : "dealer"} />
-              <strong>{character.name || "캐릭터명"}</strong>
+              <strong>
+                <LopecCharacterLink name={character.name} />
+              </strong>
             </span>
             {supportCapable ? (
               <button

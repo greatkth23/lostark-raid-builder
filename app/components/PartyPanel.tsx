@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import lostarkGoldIcon from "../../lostark_gold.png";
+import LopecCharacterLink from "./LopecCharacterLink";
 import { getRaidDefinition, sortRaidFamiliesForPartyTabs } from "../lib/raidCatalog";
 import { roleLabel, type AssignedMember, type RaidGroup, type RaidPlanResult } from "../lib/raidPlanner";
 import {
@@ -313,6 +314,7 @@ export default function PartyPanel({
             completedPartyIds={completedPartyIds}
             departingPartyIds={departingPartyIds}
             displayName={displayName}
+            nameMode={nameMode}
             dragging={dragging}
             onDragStart={setDragging}
             onDragEnd={() => setDragging(null)}
@@ -472,13 +474,14 @@ function RaidFamilyTabs({ items, value, onChange }: {
   );
 }
 
-function PartyGroupGrid({ groups, allGroups, masonry, completedPartyIds, departingPartyIds, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
+function PartyGroupGrid({ groups, allGroups, masonry, completedPartyIds, departingPartyIds, displayName, nameMode, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
   groups: RaidGroup[];
   allGroups: RaidGroup[];
   masonry: boolean;
   completedPartyIds: Set<string>;
   departingPartyIds: Set<string>;
   displayName: (member: AssignedMember) => string;
+  nameMode: NameMode;
   dragging: { memberId: string; groupId: string } | null;
   onDragStart: (value: { memberId: string; groupId: string }) => void;
   onDragEnd: () => void;
@@ -548,6 +551,7 @@ function PartyGroupGrid({ groups, allGroups, masonry, completedPartyIds, departi
           completed={completedPartyIds.has(group.id)}
           departing={departingPartyIds.has(group.id)}
           displayName={displayName}
+          nameMode={nameMode}
           dragging={dragging}
           onDragStart={onDragStart}
           onDragEnd={onDragEnd}
@@ -564,12 +568,13 @@ function PartyGroupGrid({ groups, allGroups, masonry, completedPartyIds, departi
   );
 }
 
-function PartyCard({ group, groupIndex, completed, departing, displayName, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
+function PartyCard({ group, groupIndex, completed, departing, displayName, nameMode, dragging, onDragStart, onDragEnd, onDrop, onOpenSwap, onOpenAdd, onToggleComplete }: {
   group: RaidGroup;
   groupIndex: number;
   completed: boolean;
   departing: boolean;
   displayName: (member: AssignedMember) => string;
+  nameMode: NameMode;
   dragging: { memberId: string; groupId: string } | null;
   onDragStart: (value: { memberId: string; groupId: string }) => void;
   onDragEnd: () => void;
@@ -607,7 +612,14 @@ function PartyCard({ group, groupIndex, completed, departing, displayName, dragg
               }}
               onDragEnd={onDragEnd}
             >
-              <span className="party-character-name">{displayName(member)}</span>
+              {nameMode === "character" ? (
+                <LopecCharacterLink
+                  className="party-character-name party-character-name-link"
+                  name={member.characterName}
+                />
+              ) : (
+                <span className="party-character-name">{displayName(member)}</span>
+              )}
               <span className="party-class-name">{member.className}</span>
               <span className="party-level">{formatItemLevel(member.itemLevel)}</span>
               <span className={`party-power ${member.role}`}>
