@@ -5010,7 +5010,7 @@ button.integrated-character-role-pill:focus-visible {
 
 /* Tighten character cards while giving completion controls a clearer target. */
 .integrated-character-card {
-  padding: 14px 14px 12px;
+  padding: 16px 16px 14px;
 }
 
 .integrated-raid-card {
@@ -5026,7 +5026,7 @@ button.integrated-character-role-pill:focus-visible {
 
 @media (max-width: 640px) {
   .integrated-character-card {
-    padding: 14px 12px 12px;
+    padding: 16px 14px 14px;
   }
 
   .integrated-raid-card {
