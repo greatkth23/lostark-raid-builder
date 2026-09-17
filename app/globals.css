@@ -303,7 +303,7 @@
   border: 1px solid #d9e2ed;
   border-radius: 9px;
   background: #fff;
-  padding: 18px 24px 16px;
+  padding: 16px 22px 14px;
   box-shadow: 0 1px 2px rgb(15 23 42 / 7%);
   transition: border-color .15s, background .15s, opacity .15s;
 }
@@ -497,7 +497,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
   .party-card-row:not(.masonry) .party-card { flex: 0 0 min(390px, calc(100vw - 72px)); }
-  .party-card { padding: 18px 14px 14px; }
+  .party-card { padding: 16px 12px 12px; }
   .party-current-character,
   .party-swap-candidates button { grid-template-columns: 38px minmax(70px, 1fr) auto; }
   .party-current-character > span:nth-of-type(3),
