@@ -145,6 +145,27 @@ export const RAID_DEFINITIONS = parseRaidInfoMarkdown(raidInfoMarkdown);
 export const getRaidDefinition = (raidName: string) =>
   RAID_DEFINITIONS.find((raid) => raid.name === raidName);
 
+export const sortRaidFamiliesForPartyTabs = (
+  families: Iterable<string>,
+  definitions: RaidDefinition[] = RAID_DEFINITIONS,
+) => {
+  const priorities = new Map<string, { highestEntryLevel: number; lastRow: number }>();
+  definitions.forEach((raid, index) => {
+    const current = priorities.get(raid.family);
+    priorities.set(raid.family, {
+      highestEntryLevel: Math.max(current?.highestEntryLevel ?? 0, raid.minItemLevel),
+      lastRow: index,
+    });
+  });
+
+  return Array.from(new Set(families)).sort((a, b) => {
+    const aPriority = priorities.get(a);
+    const bPriority = priorities.get(b);
+    return (bPriority?.highestEntryLevel ?? 0) - (aPriority?.highestEntryLevel ?? 0) ||
+      (bPriority?.lastRow ?? -1) - (aPriority?.lastRow ?? -1);
+  });
+};
+
 export const getExclusiveRaidNames = (raidName: string) => {
   const raid = getRaidDefinition(raidName);
   if (!raid) return [];
@@ -158,6 +179,7 @@ export const getExclusiveRaidNames = (raidName: string) => {
 const compareRaidPriority = (a: RaidDefinition, b: RaidDefinition) =>
   b.minItemLevel - a.minItemLevel ||
   b.gold - a.gold ||
+  b.size - a.size ||
   RAID_DEFINITIONS.indexOf(a) - RAID_DEFINITIONS.indexOf(b);
 
 export const getAutoRaidsForLevel = (itemLevel: number) => {

@@ -4,6 +4,7 @@ import {
   RAID_DEFINITIONS,
   getAutoRaidsForLevel,
   getExclusiveRaidNames,
+  sortRaidFamiliesForPartyTabs,
 } from "./raidCatalog";
 
 describe("벨가르딘 레이드 카탈로그", () => {
@@ -56,5 +57,27 @@ describe("벨가르딘 레이드 카탈로그", () => {
     [1780, "벨가르딘 나메"],
   ])("아이템 레벨 %i에서 %s을 자동 등록한다", (itemLevel, raidName) => {
     expect(getAutoRaidsForLevel(itemLevel)[0]).toBe(raidName);
+  });
+});
+
+describe("파티 목록 레이드 계열 탭 정렬", () => {
+  it("현재 파티가 있는 계열만 문서의 최고 입장 레벨 내림차순으로 정렬한다", () => {
+    expect(sortRaidFamiliesForPartyTabs([
+      "4막", "세르카", "벨가르딘", "종막", "성당", "3막", "2막",
+    ])).toEqual([
+      "벨가르딘", "성당", "세르카", "종막", "4막", "3막", "2막",
+    ]);
+  });
+
+  it("최고 입장 레벨이 같으면 문서에서 더 아래에 있는 계열을 먼저 둔다", () => {
+    const definitions = [
+      { ...RAID_DEFINITIONS[0], family: "앞쪽", minItemLevel: 1700 },
+      { ...RAID_DEFINITIONS[0], family: "앞쪽", minItemLevel: 1750 },
+      { ...RAID_DEFINITIONS[0], family: "뒤쪽", minItemLevel: 1750 },
+    ];
+
+    expect(sortRaidFamiliesForPartyTabs(["앞쪽", "뒤쪽"], definitions)).toEqual([
+      "뒤쪽", "앞쪽",
+    ]);
   });
 });

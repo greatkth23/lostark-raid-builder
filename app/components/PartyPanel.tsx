@@ -3,7 +3,8 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import lostarkGoldIcon from "../../lostark_gold.png";
-import { getRaidDefinition, roleLabel, type AssignedMember, type RaidGroup, type RaidPlanResult } from "../lib/raidPlanner";
+import { getRaidDefinition, sortRaidFamiliesForPartyTabs } from "../lib/raidCatalog";
+import { roleLabel, type AssignedMember, type RaidGroup, type RaidPlanResult } from "../lib/raidPlanner";
 import {
   allPlanGroups,
   canPlaceMember,
@@ -161,7 +162,7 @@ export default function PartyPanel({
         label: "전체",
         tabId: "party-raid-family-tab-all",
       },
-      ...Array.from(groupsByFamily.keys()).map((family, index) => ({
+      ...sortRaidFamiliesForPartyTabs(groupsByFamily.keys()).map((family, index) => ({
         family,
         label: family,
         tabId: `party-raid-family-tab-${index}`,
