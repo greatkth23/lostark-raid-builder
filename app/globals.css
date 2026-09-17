@@ -3121,6 +3121,62 @@ button:not(:disabled) {
   margin-top: 18px;
 }
 
+.confirmation-dialog {
+  width: min(440px, calc(100% - 36px));
+  max-height: calc(100% - 36px);
+  margin: auto;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgb(15 23 42 / 20%);
+  padding: 18px;
+  color: #111827;
+}
+
+.confirmation-dialog::backdrop {
+  background: rgb(15 23 42 / 38%);
+}
+
+.confirmation-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.confirmation-dialog-head h2 {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 28px;
+}
+
+.confirmation-dialog p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.confirmation-dialog .settings-modal-actions button {
+  min-height: 36px;
+  padding: 7px 14px;
+}
+
+.confirmation-danger-button {
+  border: 1px solid #dc2626;
+  border-radius: 7px;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.confirmation-dialog button:focus-visible {
+  outline: 2px solid #64748b;
+  outline-offset: 2px;
+}
+
 .settings-error {
   margin-top: 15px;
   border: 1px solid #fecaca;

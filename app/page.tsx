@@ -71,6 +71,19 @@ class RosterFetchError extends Error {
 
 type TabKey = "players" | "results";
 
+type PendingConfirmation = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  tone: "danger" | "neutral";
+  roomId: string;
+  revision: number;
+  raidWeek: string;
+  playersFingerprint: string;
+  planFingerprint?: string;
+  onConfirm: () => void;
+};
+
 const STORAGE_KEY = "lostark-raid-builder-v3";
 const LEGACY_STORAGE_KEYS = [
   "lostark-raid-builder-v2",
@@ -153,6 +166,7 @@ export default function Home() {
   const [completedPartyIds, setCompletedPartyIds] = useState<Set<string>>(new Set());
   const [updatingParty, setUpdatingParty] = useState(false);
   const [notice, setNotice] = useState("");
+  const [pendingConfirmation, setPendingConfirmation] = useState<PendingConfirmation | null>(null);
   const [syncingId, setSyncingId] = useState("");
   const [pendingScrollPlayerId, setPendingScrollPlayerId] = useState("");
   const [favoritePlayersByRoom, setFavoritePlayersByRoom] = useState<
@@ -218,6 +232,7 @@ export default function Home() {
         snapshotRequestIdRef.current += 1;
         roomRef.current = null;
         setRoom(null);
+        setPendingConfirmation(null);
         return;
       }
       if (!response.ok) return;
@@ -257,6 +272,7 @@ export default function Home() {
             if (response.status === 401) {
               roomRef.current = null;
               setRoom(null);
+              setPendingConfirmation(null);
             }
             throw new Error(body.message ?? "공유 데이터를 저장하지 못했습니다.");
           }
@@ -327,6 +343,41 @@ export default function Home() {
   const fingerprint = useMemo(() => JSON.stringify(players), [players]);
   const isPlanStale = Boolean(generatedPlan) && generatedFingerprint !== fingerprint;
   const favoritePlayerId = room ? favoritePlayersByRoom[room.id] ?? "" : "";
+
+  const requestConfirmation = (
+    details: Pick<PendingConfirmation, "title" | "description" | "confirmLabel" | "tone" | "onConfirm">,
+    includePlan = false,
+  ) => {
+    const currentRoom = roomRef.current;
+    if (!currentRoom) return;
+    setPendingConfirmation({
+      ...details,
+      roomId: currentRoom.id,
+      revision: currentRoom.revision,
+      raidWeek: raidWeekRef.current,
+      playersFingerprint: fingerprint,
+      ...(includePlan ? { planFingerprint: JSON.stringify(generatedPlan) } : {}),
+    });
+  };
+
+  const confirmPendingAction = () => {
+    if (!pendingConfirmation) return;
+    setPendingConfirmation(null);
+    const currentRoom = roomRef.current;
+    if (
+      currentRoom?.id !== pendingConfirmation.roomId ||
+      currentRoom?.revision !== pendingConfirmation.revision ||
+      raidWeekRef.current !== pendingConfirmation.raidWeek ||
+      fingerprint !== pendingConfirmation.playersFingerprint ||
+      (pendingConfirmation.planFingerprint !== undefined &&
+        JSON.stringify(generatedPlan) !== pendingConfirmation.planFingerprint)
+    ) {
+      setNotice("공유 데이터가 변경되었습니다. 내용을 확인한 뒤 다시 시도해 주세요.");
+      return;
+    }
+    setNotice("");
+    pendingConfirmation.onConfirm();
+  };
 
   const characterInputs = useMemo<CharacterInput[]>(
     () => buildCharacterInputs(players, raidWeek),
@@ -479,7 +530,15 @@ export default function Home() {
   };
 
   const removePlayer = (playerId: string) => {
-    commitOperation({ type: "player.remove", playerId });
+    const player = players.find((candidate) => candidate.id === playerId);
+    if (!player || players.length === 1) return;
+    requestConfirmation({
+      title: "플레이어 삭제",
+      description: `“${player.name}” 플레이어와 소속 원정대·캐릭터를 삭제할까요?`,
+      confirmLabel: "삭제",
+      tone: "danger",
+      onConfirm: () => commitOperation({ type: "player.remove", playerId }),
+    });
   };
 
   const addExpedition = (playerId: string) => {
@@ -493,7 +552,16 @@ export default function Home() {
   };
 
   const removeExpedition = (playerId: string, expeditionId: string) => {
-    commitOperation({ type: "expedition.remove", playerId, expeditionId });
+    const expedition = players.find((player) => player.id === playerId)
+      ?.expeditions.find((candidate) => candidate.id === expeditionId);
+    if (!expedition) return;
+    requestConfirmation({
+      title: "원정대 삭제",
+      description: `“${expedition.name}” 원정대와 소속 캐릭터 ${expedition.characters.length}개를 삭제할까요?`,
+      confirmLabel: "삭제",
+      tone: "danger",
+      onConfirm: () => commitOperation({ type: "expedition.remove", playerId, expeditionId }),
+    });
   };
 
   const restoreCharacter = (
@@ -514,11 +582,21 @@ export default function Home() {
     expeditionId: string,
     characterId: string,
   ) => {
-    commitOperation({
-      type: "character.remove",
-      playerId,
-      expeditionId,
-      characterId,
+    const character = players.find((player) => player.id === playerId)
+      ?.expeditions.find((expedition) => expedition.id === expeditionId)
+      ?.characters.find((candidate) => candidate.id === characterId);
+    if (!character) return;
+    requestConfirmation({
+      title: "캐릭터 삭제",
+      description: `“${character.name || "캐릭터"}” 캐릭터를 삭제할까요?${character.name.trim() ? " 삭제 후 원정대의 복원 목록에서 되돌릴 수 있습니다." : ""}`,
+      confirmLabel: "삭제",
+      tone: "danger",
+      onConfirm: () => commitOperation({
+        type: "character.remove",
+        playerId,
+        expeditionId,
+        characterId,
+      }),
     });
   };
 
@@ -559,19 +637,42 @@ export default function Home() {
     raidName: string,
     checked: boolean,
   ) => {
-    commitOperation({
+    const operation: RaidGroupOperation = {
       type: "character.raid",
       playerId,
       expeditionId,
       characterId,
       raidName,
       checked,
-    });
+    };
+    if (!checked) {
+      const character = players.find((player) => player.id === playerId)
+        ?.expeditions.find((expedition) => expedition.id === expeditionId)
+        ?.characters.find((candidate) => candidate.id === characterId);
+      if (!character?.selectedRaids.includes(raidName)) return;
+      requestConfirmation({
+        title: "레이드 삭제",
+        description: `“${character.name || "캐릭터"}” 캐릭터의 “${raidName}” 선택과 완료 표시를 삭제할까요?`,
+        confirmLabel: "삭제",
+        tone: "danger",
+        onConfirm: () => commitOperation(operation),
+      });
+      return;
+    }
+    commitOperation(operation);
   };
 
   const resetAllRaids = () => {
-    commitOperation({ type: "raids.reset" });
-    setNotice("아이템 레벨 기준으로 레이드를 다시 자동 등록했습니다.");
+    requestConfirmation({
+      title: "레이드 자동 등록",
+      description: "모든 캐릭터의 기존 레이드 선택과 완료 표시를 지우고 아이템 레벨 기준으로 다시 등록할까요?",
+      confirmLabel: "초기화",
+      tone: "danger",
+      onConfirm: () => {
+        commitOperation({ type: "raids.reset" });
+        setNotice("아이템 레벨 기준으로 레이드를 다시 자동 등록했습니다.");
+      },
+    });
   };
 
   const commitPartyPlan = (
@@ -612,33 +713,40 @@ export default function Home() {
       setNotice(result.reason);
       return;
     }
-    if (
-      result.raidChanged &&
-      !window.confirm(
+    const applyMove = () => {
+      const movedLocation = locateCharacter(players, memberId);
+      const swappedLocation = result.swappedMemberId
+        ? locateCharacter(players, result.swappedMemberId)
+        : null;
+      const raidChanges: NonNullable<Extract<RaidGroupOperation, { type: "party.layout.set" }>["raidChanges"]> = [];
+      if (result.raidChanged && movedLocation && target) {
+        raidChanges.push({ ...movedLocation, raidName: target.raidName, checked: true });
+      }
+      if (result.raidChanged && swappedLocation && source) {
+        raidChanges.push({ ...swappedLocation, raidName: source.raidName, checked: true });
+      }
+      commitPartyPlan(result.plan, raidChanges);
+      setNotice(
         result.swappedMemberId
+          ? "같은 플레이어의 두 캐릭터를 맞교환했습니다."
+          : source && target
+            ? `${source.raidName}에서 ${target.raidName} 파티로 이동했습니다.`
+            : "파티를 이동했습니다.",
+      );
+    };
+    if (result.raidChanged) {
+      requestConfirmation({
+        title: result.swappedMemberId ? "난이도 맞교환" : "난이도 이동",
+        description: result.swappedMemberId
           ? "다른 난이도 사이에서 맞교환하면 두 캐릭터의 레이드 선택도 함께 변경됩니다. 맞교환할까요?"
           : "다른 난이도로 이동하면 멤버 목록의 레이드 선택도 함께 변경됩니다. 이동할까요?",
-      )
-    ) return;
-    const movedLocation = locateCharacter(players, memberId);
-    const swappedLocation = result.swappedMemberId
-      ? locateCharacter(players, result.swappedMemberId)
-      : null;
-    const raidChanges: NonNullable<Extract<RaidGroupOperation, { type: "party.layout.set" }>["raidChanges"]> = [];
-    if (result.raidChanged && movedLocation && target) {
-      raidChanges.push({ ...movedLocation, raidName: target.raidName, checked: true });
+        confirmLabel: result.swappedMemberId ? "맞교환" : "이동",
+        tone: "neutral",
+        onConfirm: applyMove,
+      }, true);
+      return;
     }
-    if (result.raidChanged && swappedLocation && source) {
-      raidChanges.push({ ...swappedLocation, raidName: source.raidName, checked: true });
-    }
-    commitPartyPlan(result.plan, raidChanges);
-    setNotice(
-      result.swappedMemberId
-        ? "같은 플레이어의 두 캐릭터를 맞교환했습니다."
-        : source && target
-          ? `${source.raidName}에서 ${target.raidName} 파티로 이동했습니다.`
-          : "파티를 이동했습니다.",
-    );
+    applyMove();
   };
 
   const swapPlanMember = (memberId: string, groupId: string, candidateId: string) => {
@@ -675,23 +783,32 @@ export default function Home() {
       setNotice(result.reason);
       return;
     }
-    if (
-      result.raidChanged &&
-      !window.confirm("서로 다른 난이도의 캐릭터를 교환하면 멤버 목록의 레이드 선택도 함께 변경됩니다. 교환할까요?")
-    ) return;
-    const currentLocation = locateCharacter(players, memberId);
-    const raidChanges: NonNullable<Extract<RaidGroupOperation, { type: "party.layout.set" }>["raidChanges"]> = [];
-    if (candidateGroup) {
-      if (candidateGroup.raidName !== currentGroup.raidName && currentLocation) {
+    const applySwap = () => {
+      const currentLocation = locateCharacter(players, memberId);
+      const raidChanges: NonNullable<Extract<RaidGroupOperation, { type: "party.layout.set" }>["raidChanges"]> = [];
+      if (candidateGroup) {
+        if (candidateGroup.raidName !== currentGroup.raidName && currentLocation) {
+          raidChanges.push({ ...candidateLocation, raidName: currentGroup.raidName, checked: true });
+          raidChanges.push({ ...currentLocation, raidName: candidateGroup.raidName, checked: true });
+        }
+      } else {
         raidChanges.push({ ...candidateLocation, raidName: currentGroup.raidName, checked: true });
-        raidChanges.push({ ...currentLocation, raidName: candidateGroup.raidName, checked: true });
+        if (currentLocation) raidChanges.push({ ...currentLocation, raidName: currentGroup.raidName, checked: false });
       }
-    } else {
-      raidChanges.push({ ...candidateLocation, raidName: currentGroup.raidName, checked: true });
-      if (currentLocation) raidChanges.push({ ...currentLocation, raidName: currentGroup.raidName, checked: false });
+      commitPartyPlan(result.plan, raidChanges);
+      setNotice("캐릭터를 교환했습니다.");
+    };
+    if (result.raidChanged) {
+      requestConfirmation({
+        title: "난이도 교환",
+        description: "서로 다른 난이도의 캐릭터를 교환하면 멤버 목록의 레이드 선택도 함께 변경됩니다. 교환할까요?",
+        confirmLabel: "교환",
+        tone: "neutral",
+        onConfirm: applySwap,
+      }, true);
+      return;
     }
-    commitPartyPlan(result.plan, raidChanges);
-    setNotice("캐릭터를 교환했습니다.");
+    applySwap();
   };
 
   const saveAppSettings = async ({
@@ -890,12 +1007,20 @@ export default function Home() {
   };
 
   const resetRaidCompletions = () => {
-    if (!window.confirm("이번 주 레이드 완료 체크를 모두 초기화할까요?")) return;
-    commitOperation({ type: "completion.reset" });
-    setNotice("이번 주 레이드 완료 체크를 모두 초기화했습니다.");
+    requestConfirmation({
+      title: "완료 상태 초기화",
+      description: "이번 주 레이드 완료 체크를 모두 초기화할까요? 이 변경은 공유 공격대 전체에 반영됩니다.",
+      confirmLabel: "초기화",
+      tone: "danger",
+      onConfirm: () => {
+        commitOperation({ type: "completion.reset" });
+        setNotice("이번 주 레이드 완료 체크를 모두 초기화했습니다.");
+      },
+    });
   };
 
   const leaveRaidGroup = async () => {
+    setPendingConfirmation(null);
     await fetch("/api/raid-group", { method: "DELETE" }).catch(() => undefined);
     roomRef.current = null;
     raidWeekRef.current = "";
@@ -933,7 +1058,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-white text-[#151923]">
+    <main className="min-h-screen bg-white text-[#151923]" tabIndex={-1}>
       <div className="workspace-shell mx-auto flex max-w-[1100px] flex-col gap-5 px-6 py-5">
         <header className="app-header">
           <div className="room-identity">
@@ -1040,7 +1165,93 @@ export default function Home() {
           />
         )}
       </div>
+      {pendingConfirmation ? (
+        <ConfirmationDialog
+          title={pendingConfirmation.title}
+          description={pendingConfirmation.description}
+          confirmLabel={pendingConfirmation.confirmLabel}
+          tone={pendingConfirmation.tone}
+          onCancel={() => setPendingConfirmation(null)}
+          onConfirm={confirmPendingAction}
+        />
+      ) : null}
     </main>
+  );
+}
+
+function ConfirmationDialog({
+  title,
+  description,
+  confirmLabel,
+  tone,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  tone: "danger" | "neutral";
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const previousFocus = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    const popoverTrigger = previousFocus?.closest(".compact-raid-popover")
+      ?.parentElement?.querySelector<HTMLElement>(".raid-popover-control > button");
+    if (!dialog) return;
+    dialog.showModal();
+    cancelRef.current?.focus();
+    return () => {
+      dialog.close();
+      if (previousFocus?.isConnected && previousFocus.getClientRects().length) {
+        previousFocus.focus();
+      } else {
+        (popoverTrigger?.isConnected
+          ? popoverTrigger
+          : document.querySelector<HTMLElement>(".member-shell button:not([disabled]), .party-panel button:not([disabled]), main"))?.focus();
+      }
+    };
+  }, []);
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="confirmation-dialog"
+      aria-labelledby="confirmation-title"
+      aria-describedby="confirmation-description"
+      onCancel={(event) => {
+        event.preventDefault();
+        onCancel();
+      }}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (
+          event.clientX < bounds.left || event.clientX > bounds.right ||
+          event.clientY < bounds.top || event.clientY > bounds.bottom
+        ) onCancel();
+      }}
+    >
+      <div className="confirmation-dialog-head">
+        <h2 id="confirmation-title">{title}</h2>
+        <button className="settings-close-button" type="button" aria-label="확인창 닫기" onClick={onCancel}>
+          <CoolIcon name="close" />
+        </button>
+      </div>
+      <p id="confirmation-description">{description}</p>
+      <div className="settings-modal-actions">
+        <button ref={cancelRef} className="ghost-button" type="button" onClick={onCancel}>취소</button>
+        <button className={tone === "danger" ? "confirmation-danger-button" : "dark-button"} type="button" onClick={onConfirm}>
+          {confirmLabel}
+        </button>
+      </div>
+    </dialog>
   );
 }
 
