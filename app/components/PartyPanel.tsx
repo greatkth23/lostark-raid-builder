@@ -607,7 +607,6 @@ function PartyCard({ group, groupIndex, completed, departing, displayName, dragg
               }}
               onDragEnd={onDragEnd}
             >
-              <span className="party-role-badge">{roleLabel(member.role)}</span>
               <span className="party-character-name">{displayName(member)}</span>
               <span className="party-class-name">{member.className}</span>
               <span className="party-level">{formatItemLevel(member.itemLevel)}</span>
@@ -621,7 +620,6 @@ function PartyCard({ group, groupIndex, completed, departing, displayName, dragg
             </div>
           ) : (
             <button className={`party-empty-slot ${role}`} key={`${role}-empty-${index}`} type="button" onClick={() => onOpenAdd(group, role)} disabled={completed || departing}>
-              <span className="party-role-badge">{roleLabel(role)}</span>
               <span>+ 캐릭터 추가</span>
             </button>
           ))}
