@@ -749,7 +749,7 @@ function SwapModal({ state, groups, players, raidWeek, onClose, onSelect }: {
   );
 }
 
-const formatItemLevel = (value: number) => Math.trunc(value).toLocaleString("ko-KR");
+const formatItemLevel = (value: number) => String(Math.trunc(value));
 
 const orderCompletedGroups = (groups: RaidGroup[], completedPartyIds: Set<string>) =>
   groups
