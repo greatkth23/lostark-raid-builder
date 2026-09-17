@@ -5801,9 +5801,21 @@ button:not(:disabled) {
 }
 
 .member-shell .expedition-head {
+  position: relative;
   flex-direction: row;
   align-items: flex-start;
   gap: 10px;
+}
+
+.member-shell .expedition-head > div:first-child {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.member-shell .expedition-head .edit-icon-button,
+.member-shell .expedition-head .expedition-name-input {
+  pointer-events: auto;
 }
 
 .member-shell .expedition-block.is-collapsed .expedition-head {
@@ -5811,23 +5823,41 @@ button:not(:disabled) {
 }
 
 .expedition-disclosure-button {
-  display: inline-grid;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
-  place-items: center;
-  margin-left: auto;
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   border: 0;
-  border-radius: 6px;
+  border-radius: 0;
   background: transparent;
   color: #64748b;
+  cursor: pointer;
 }
 
 .expedition-disclosure-button:hover {
+  background: transparent;
+}
+
+.expedition-disclosure-button::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  content: "";
+}
+
+.expedition-disclosure-button:hover::before,
+.expedition-disclosure-button:focus-visible::before {
   background: #f1f5f9;
 }
 
 .expedition-disclosure-button .cool-icon {
+  position: absolute;
+  top: 6px;
+  right: 6px;
   width: 20px;
   height: 20px;
   transition: transform 260ms ease;
