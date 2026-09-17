@@ -866,7 +866,12 @@ export default function Home() {
     return payload.characters ?? [];
   };
 
-  const syncRoster = async (playerId: string, expeditionId: string, representativeName?: string) => {
+  const syncRoster = async (
+    playerId: string,
+    expeditionId: string,
+    representativeName?: string,
+    alias?: string,
+  ) => {
     const player = players.find((candidate) => candidate.id === playerId);
     const expedition = player?.expeditions.find(
       (candidate) => candidate.id === expeditionId,
@@ -876,9 +881,11 @@ export default function Home() {
       return;
     }
 
-    const expeditionToSync = representativeName === undefined
-      ? expedition
-      : { ...expedition, representativeName };
+    const expeditionToSync = {
+      ...expedition,
+      ...(representativeName === undefined ? {} : { representativeName }),
+      ...(alias === undefined ? {} : { name: alias }),
+    };
     if (!expeditionToSync.representativeName.trim()) {
       setNotice("대표 캐릭터명을 입력하세요.");
       return;
@@ -897,7 +904,7 @@ export default function Home() {
       });
       setGeneratedPlan(null);
       setGeneratedFingerprint("");
-      setNotice(`${expedition.name}: 캐릭터 ${roster.length}명을 동기화했습니다.`);
+      setNotice(`${expeditionToSync.name}: 캐릭터 ${roster.length}명을 동기화했습니다.`);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "동기화에 실패했습니다.");
     } finally {
@@ -1933,7 +1940,7 @@ function PlayerEditor({
     expeditionId: string,
     patch: Partial<Expedition>,
   ) => void;
-  onSyncRoster: (playerId: string, expeditionId: string, representativeName?: string) => void;
+  onSyncRoster: (playerId: string, expeditionId: string, representativeName?: string, alias?: string) => void;
   onSyncAll: () => void;
   onResetAllRaids: () => void;
   onRestoreCharacter: (
@@ -1978,11 +1985,6 @@ function PlayerEditor({
   const [editingPlayers, setEditingPlayers] = useState<
     Map<string, { initialValue: string; value: string }>
   >(new Map());
-  const [editingExpeditions, setEditingExpeditions] = useState<
-    Map<string, { initialValue: string; value: string }>
-  >(
-    new Map(),
-  );
   const [isMemberManagerOpen, setIsMemberManagerOpen] = useState(false);
   const [settingsTarget, setSettingsTarget] = useState<{
     playerId: string;
@@ -2000,8 +2002,7 @@ function PlayerEditor({
     displayedPlayers.find((player) => player.id === activePlayerId) ??
     displayedPlayers[0];
 
-  const hasActiveNameEdit =
-    editingPlayers.size > 0 || editingExpeditions.size > 0;
+  const hasActiveNameEdit = editingPlayers.size > 0;
 
   useEffect(() => {
     onNameEditingChange(hasActiveNameEdit);
@@ -2039,39 +2040,6 @@ function PlayerEditor({
     setEditingPlayers((current) => {
       const next = new Map(current);
       next.delete(playerId);
-      return next;
-    });
-  };
-
-  const startEditingExpedition = (expeditionId: string, name: string) => {
-    setEditingExpeditions((current) =>
-      new Map(current).set(expeditionId, {
-        initialValue: name,
-        value: name,
-      }),
-    );
-  };
-
-  const updateEditingExpedition = (expeditionId: string, value: string) => {
-    setEditingExpeditions((current) => {
-      const draft = current.get(expeditionId);
-      if (!draft) return current;
-      return new Map(current).set(expeditionId, { ...draft, value });
-    });
-  };
-
-  const stopEditingExpedition = (
-    playerId: string,
-    expeditionId: string,
-    value: string,
-  ) => {
-    const draft = editingExpeditions.get(expeditionId);
-    if (draft && value !== draft.initialValue) {
-      onUpdateExpedition(playerId, expeditionId, { name: value });
-    }
-    setEditingExpeditions((current) => {
-      const next = new Map(current);
-      next.delete(expeditionId);
       return next;
     });
   };
@@ -2209,8 +2177,6 @@ function PlayerEditor({
                 key={expedition.id}
                 player={activePlayer}
                 raidWeek={raidWeek}
-                onRestoreCharacter={onRestoreCharacter}
-                onRemoveExpedition={onRemoveExpedition}
                 onSetRole={onSetRole}
                 onSetGoldPreference={onSetGoldPreference}
                 onSetCompletion={onSetCompletion}
@@ -2223,19 +2189,6 @@ function PlayerEditor({
                     playerId: activePlayer.id,
                     expeditionId: expedition.id,
                   })
-                }
-                isEditingName={editingExpeditions.has(expedition.id)}
-                nameDraft={
-                  editingExpeditions.get(expedition.id)?.value ?? expedition.name
-                }
-                onChangeNameDraft={(value) =>
-                  updateEditingExpedition(expedition.id, value)
-                }
-                onStartEditName={() =>
-                  startEditingExpedition(expedition.id, expedition.name)
-                }
-                onStopEditName={(value) =>
-                  stopEditingExpedition(activePlayer.id, expedition.id, value)
                 }
               />
             ))}
@@ -2307,7 +2260,9 @@ function PlayerEditor({
           onClose={() => setSettingsTarget(null)}
           onSyncRoster={onSyncRoster}
           onUpdateExpedition={onUpdateExpedition}
+          onRestoreCharacter={onRestoreCharacter}
           onRemoveCharacter={onRemoveCharacter}
+          onRemoveExpedition={onRemoveExpedition}
         />
       ) : null}
     </section>
@@ -2318,31 +2273,16 @@ function ExpeditionBlock({
   player,
   expedition,
   raidWeek,
-  isEditingName,
-  nameDraft,
-  onRestoreCharacter,
-  onRemoveExpedition,
   onSetRole,
   onSetGoldPreference,
   onSetCompletion,
   onOpenSettings,
-  onChangeNameDraft,
-  onStartEditName,
-  onStopEditName,
   onToggleCollapsed,
   onToggleRaid,
 }: {
   player: Player;
   expedition: Expedition;
   raidWeek: string;
-  isEditingName: boolean;
-  nameDraft: string;
-  onRestoreCharacter: (
-    playerId: string,
-    expeditionId: string,
-    characterName: string,
-  ) => void;
-  onRemoveExpedition: (playerId: string, expeditionId: string) => void;
   onSetRole: (
     playerId: string,
     expeditionId: string,
@@ -2363,9 +2303,6 @@ function ExpeditionBlock({
     completed: boolean,
   ) => void;
   onOpenSettings: () => void;
-  onChangeNameDraft: (value: string) => void;
-  onStartEditName: () => void;
-  onStopEditName: (value: string) => void;
   onToggleCollapsed: () => void;
   onToggleRaid: (
     playerId: string,
@@ -2375,7 +2312,6 @@ function ExpeditionBlock({
     checked: boolean,
   ) => void;
 }) {
-  const [restoreOpen, setRestoreOpen] = useState(false);
   const [contentUnclipped, setContentUnclipped] = useState(!expedition.charactersHidden);
   useEffect(() => {
     // Keep menus visible after opening, but clip the content during the slide.
@@ -2383,9 +2319,6 @@ function ExpeditionBlock({
       expedition.charactersHidden ? 0 : 280);
     return () => window.clearTimeout(timer);
   }, [expedition.charactersHidden]);
-  const restorableCharacters = getRestorableCharacters(expedition);
-  const needsRepresentativeSetup =
-    !expedition.representativeName.trim() && expedition.characters.length === 0;
   const goldProgress = getExpeditionTradableGoldProgress(expedition, raidWeek);
 
   return (
@@ -2393,30 +2326,14 @@ function ExpeditionBlock({
       <div className="expedition-head">
         <div>
           <div className="expedition-title-line">
-            {isEditingName ? (
-              <input
-                aria-label="원정대 별칭"
-                autoFocus
-                className="expedition-name-input"
-                value={nameDraft}
-                onBlur={(event) => onStopEditName(event.currentTarget.value)}
-                onChange={(event) => onChangeNameDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === "Escape") {
-                    event.currentTarget.blur();
-                  }
-                }}
-              />
-            ) : (
-              <span className="expedition-name-text">{expedition.name}</span>
-            )}
+            <span className="expedition-name-text">{expedition.name}</span>
             <button
-              className="icon-button edit-icon-button"
+              className="icon-button expedition-settings-trigger"
               type="button"
-              aria-label="원정대 별칭 수정"
-              onClick={onStartEditName}
+              aria-label={`${expedition.name} 원정대 설정`}
+              onClick={onOpenSettings}
             >
-              <CoolIcon name="edit" />
+              <CoolIcon name="settings" />
             </button>
           </div>
           <div className="expedition-meta">
@@ -2476,51 +2393,6 @@ function ExpeditionBlock({
               />
             ))}
           </div>
-          <div className="expedition-footer">
-            <div className="restore-character-control">
-              <button
-                className="add-raid-button"
-                type="button"
-                onClick={() => {
-                  if (needsRepresentativeSetup) {
-                    onOpenSettings();
-                    return;
-                  }
-                  setRestoreOpen((current) => !current);
-                }}
-                disabled={
-                  !needsRepresentativeSetup && !restorableCharacters.length
-                }
-              >
-                <CoolIcon name="add" /> 캐릭터 추가
-              </button>
-              {restoreOpen && restorableCharacters.length ? (
-                <div className="restore-character-menu">
-                  {restorableCharacters.map((character) => (
-                    <button
-                      key={character.name}
-                      type="button"
-                      onClick={() => {
-                        onRestoreCharacter(player.id, expedition.id, character.name);
-                        setRestoreOpen(false);
-                      }}
-                    >
-                      <strong>{character.name}</strong>
-                      {character.className ? <span>{character.className}</span> : null}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-            <div className="expedition-actions">
-              <button className="ghost-button" type="button" onClick={onOpenSettings}>
-                <CoolIcon name="settings" /> 원정대 설정
-              </button>
-              <button className="danger-text-button" type="button" onClick={() => onRemoveExpedition(player.id, expedition.id)}>
-                <CoolIcon name="trash" /> 삭제
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -2533,30 +2405,43 @@ function ExpeditionSettingsModal({
   onClose,
   onSyncRoster,
   onUpdateExpedition,
+  onRestoreCharacter,
   onRemoveCharacter,
+  onRemoveExpedition,
 }: {
   player: Player;
   expedition: Expedition;
   onClose: () => void;
-  onSyncRoster: (playerId: string, expeditionId: string, representativeName?: string) => void;
+  onSyncRoster: (playerId: string, expeditionId: string, representativeName?: string, alias?: string) => void;
+  onRestoreCharacter: (playerId: string, expeditionId: string, characterName: string) => void;
   onRemoveCharacter: (playerId: string, expeditionId: string, characterId: string) => void;
+  onRemoveExpedition: (playerId: string, expeditionId: string) => void;
   onUpdateExpedition: (
     playerId: string,
     expeditionId: string,
     patch: Partial<Expedition>,
   ) => void;
 }) {
+  const initialAlias = useRef(expedition.name.trim());
   const initialRepresentativeName = useRef(expedition.representativeName.trim());
+  const [alias, setAlias] = useState(expedition.name);
   const [representativeName, setRepresentativeName] = useState(expedition.representativeName);
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const restorableCharacters = getRestorableCharacters(expedition);
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const nextAlias = alias.trim();
     const nextName = representativeName.trim();
+    const aliasChanged = nextAlias !== initialAlias.current;
     const nameChanged = nextName !== initialRepresentativeName.current;
-    if (nameChanged) {
-      onUpdateExpedition(player.id, expedition.id, { representativeName: nextName });
+    if (aliasChanged || nameChanged) {
+      onUpdateExpedition(player.id, expedition.id, {
+        ...(aliasChanged ? { name: nextAlias } : {}),
+        ...(nameChanged ? { representativeName: nextName } : {}),
+      });
     }
     onClose();
-    if (nameChanged && nextName) onSyncRoster(player.id, expedition.id, nextName);
+    if (nameChanged && nextName) onSyncRoster(player.id, expedition.id, nextName, nextAlias);
   };
 
   return (
@@ -2582,6 +2467,19 @@ function ExpeditionSettingsModal({
             <CoolIcon name="close" />
           </button>
         </div>
+
+        <label className="settings-field">
+          <span>원정대 별칭</span>
+          <input
+            className="settings-input"
+            value={alias}
+            placeholder="원정대 별칭 입력"
+            maxLength={80}
+            pattern=".*\S.*"
+            required
+            onChange={(event) => setAlias(event.target.value)}
+          />
+        </label>
 
         <label className="settings-field">
           <span>대표 캐릭터</span>
@@ -2616,9 +2514,45 @@ function ExpeditionSettingsModal({
               ))}
             </ul>
           ) : <p>등록된 캐릭터가 없습니다.</p>}
+          <button
+            className="add-raid-button expedition-restore-button"
+            type="button"
+            aria-expanded={restoreOpen}
+            onClick={() => setRestoreOpen((current) => !current)}
+            disabled={!restorableCharacters.length}
+          >
+            <CoolIcon name="add" /> 캐릭터 추가
+          </button>
+          {restoreOpen && restorableCharacters.length ? (
+            <div className="expedition-restore-list">
+              {restorableCharacters.map((character) => (
+                <button
+                  key={character.name}
+                  type="button"
+                  onClick={() => {
+                    onRestoreCharacter(player.id, expedition.id, character.name);
+                    setRestoreOpen(false);
+                  }}
+                >
+                  <strong>{character.name}</strong>
+                  {character.className ? <span>{character.className}</span> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {!restorableCharacters.length ? (
+            <p className="expedition-restore-hint">추가할 수 있는 삭제된 캐릭터가 없습니다. 새 캐릭터는 멤버 목록에서 동기화할 수 있습니다.</p>
+          ) : null}
         </section>
 
-        <div className="settings-modal-actions">
+        <div className="settings-modal-actions expedition-settings-actions">
+          <button
+            className="danger-text-button"
+            type="button"
+            onClick={() => onRemoveExpedition(player.id, expedition.id)}
+          >
+            <CoolIcon name="trash" /> 원정대 삭제
+          </button>
           <button
             className="dark-button"
             type="submit"

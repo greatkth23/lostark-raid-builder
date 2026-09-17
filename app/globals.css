@@ -5813,8 +5813,7 @@ button:not(:disabled) {
   pointer-events: none;
 }
 
-.member-shell .expedition-head .edit-icon-button,
-.member-shell .expedition-head .expedition-name-input {
+.member-shell .expedition-head .expedition-settings-trigger {
   pointer-events: auto;
 }
 
@@ -5889,21 +5888,6 @@ button:not(:disabled) {
   overflow: visible;
 }
 
-.expedition-footer {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding-top: 12px;
-}
-
-.member-shell .expedition-footer .expedition-actions {
-  width: auto;
-  flex: 0 0 auto;
-  gap: 8px;
-  margin: 0;
-}
-
 .expedition-settings-modal {
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
@@ -5952,6 +5936,49 @@ button:not(:disabled) {
 
 .expedition-settings-characters button {
   flex-shrink: 0;
+}
+
+.expedition-restore-button {
+  margin-top: 12px;
+}
+
+.expedition-restore-list {
+  display: grid;
+  margin-top: 8px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.expedition-restore-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: #ffffff;
+  padding: 9px 11px;
+  color: #111827;
+  text-align: left;
+}
+
+.expedition-restore-list button:last-child {
+  border-bottom: 0;
+}
+
+.expedition-restore-list button:hover {
+  background: #f8fafc;
+}
+
+.expedition-restore-hint {
+  margin-top: 7px;
+  line-height: 1.5;
+}
+
+.expedition-settings-actions {
+  align-items: center;
+  justify-content: space-between;
 }
 
 @media (prefers-reduced-motion: reduce) {
