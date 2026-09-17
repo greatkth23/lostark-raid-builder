@@ -544,11 +544,13 @@ export default function Home() {
   const addExpedition = (playerId: string) => {
     const player = players.find((candidate) => candidate.id === playerId);
     if (!player) return;
+    const expedition = createExpedition(player.expeditions.length + 1);
     commitOperation({
       type: "expedition.add",
       playerId,
-      expedition: createExpedition(player.expeditions.length + 1),
+      expedition,
     });
+    return expedition.id;
   };
 
   const removeExpedition = (playerId: string, expeditionId: string) => {
@@ -1933,7 +1935,7 @@ function PlayerEditor({
   onRemovePlayer: (playerId: string) => void;
   onUpdatePlayer: (playerId: string, patch: Partial<Player>) => void;
   onNameEditingChange: (isEditing: boolean) => void;
-  onAddExpedition: (playerId: string) => void;
+  onAddExpedition: (playerId: string) => string | undefined;
   onRemoveExpedition: (playerId: string, expeditionId: string) => void;
   onUpdateExpedition: (
     playerId: string,
@@ -2222,7 +2224,12 @@ function PlayerEditor({
                 type="button"
                 aria-label="원정대 추가"
                 title="원정대 추가"
-                onClick={() => onAddExpedition(activePlayer.id)}
+                onClick={() => {
+                  const expeditionId = onAddExpedition(activePlayer.id);
+                  if (expeditionId) {
+                    setSettingsTarget({ playerId: activePlayer.id, expeditionId });
+                  }
+                }}
               >
                 <CoolIcon name="add" />
                 <span className="player-footer-label">원정대 추가</span>
@@ -2445,7 +2452,12 @@ function ExpeditionSettingsModal({
   };
 
   return (
-    <div className="settings-modal-backdrop">
+    <div
+      className="settings-modal-backdrop expedition-settings-backdrop"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <form
         className="settings-modal expedition-settings-modal"
         role="dialog"
@@ -2453,11 +2465,8 @@ function ExpeditionSettingsModal({
         aria-labelledby="expedition-settings-title"
         onSubmit={handleSubmit}
       >
-        <div className="settings-modal-head">
-          <div>
-            <h2 id="expedition-settings-title">원정대 설정</h2>
-            <p>{expedition.name}</p>
-          </div>
+        <div className="settings-modal-head expedition-settings-head">
+          <h2 id="expedition-settings-title">원정대 설정</h2>
           <button
             className="settings-close-button"
             type="button"
@@ -2468,97 +2477,120 @@ function ExpeditionSettingsModal({
           </button>
         </div>
 
-        <label className="settings-field">
-          <span>원정대 별칭</span>
-          <input
-            className="settings-input"
-            value={alias}
-            placeholder="원정대 별칭 입력"
-            maxLength={80}
-            pattern=".*\S.*"
-            required
-            onChange={(event) => setAlias(event.target.value)}
-          />
-        </label>
+        <div className="expedition-settings-body">
+          <section className="expedition-settings-basics" aria-labelledby="expedition-basics-title">
+            <h3 id="expedition-basics-title">기본 정보</h3>
+            <label className="settings-field">
+              <span>원정대 별칭</span>
+              <input
+                className="settings-input"
+                value={alias}
+                placeholder="원정대 별칭 입력"
+                maxLength={80}
+                pattern=".*\S.*"
+                required
+                onChange={(event) => setAlias(event.target.value)}
+              />
+            </label>
 
-        <label className="settings-field">
-          <span>대표 캐릭터</span>
-          <input
-            className="settings-input"
-            value={representativeName}
-            placeholder="대표 캐릭터명 입력"
-            maxLength={80}
-            onChange={(event) => setRepresentativeName(event.target.value)}
-          />
-        </label>
+            <label className="settings-field">
+              <span>대표 캐릭터</span>
+              <input
+                className="settings-input"
+                value={representativeName}
+                placeholder="대표 캐릭터명 입력"
+                maxLength={80}
+                onChange={(event) => setRepresentativeName(event.target.value)}
+              />
+            </label>
+          </section>
 
-        <section className="expedition-settings-characters" aria-labelledby="expedition-characters-title">
-          <h3 id="expedition-characters-title">캐릭터 관리</h3>
-          {expedition.characters.length ? (
-            <ul>
-              {expedition.characters.map((character) => (
-                <li key={character.id}>
-                  <div>
-                    <strong>{character.name || "캐릭터"}</strong>
-                    <span>{character.className || "직업 없음"} · 레벨 {formatItemLevel(character.itemLevel)}</span>
-                  </div>
-                  <button
-                    className="danger-text-button"
-                    type="button"
-                    aria-label={`${character.name || "캐릭터"} 삭제`}
-                    onClick={() => onRemoveCharacter(player.id, expedition.id, character.id)}
-                  >
-                    <CoolIcon name="trash" /> 삭제
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : <p>등록된 캐릭터가 없습니다.</p>}
-          <button
-            className="add-raid-button expedition-restore-button"
-            type="button"
-            aria-expanded={restoreOpen}
-            onClick={() => setRestoreOpen((current) => !current)}
-            disabled={!restorableCharacters.length}
-          >
-            <CoolIcon name="add" /> 캐릭터 추가
-          </button>
-          {restoreOpen && restorableCharacters.length ? (
-            <div className="expedition-restore-list">
-              {restorableCharacters.map((character) => (
-                <button
-                  key={character.name}
-                  type="button"
-                  onClick={() => {
-                    onRestoreCharacter(player.id, expedition.id, character.name);
-                    setRestoreOpen(false);
-                  }}
-                >
-                  <strong>{character.name}</strong>
-                  {character.className ? <span>{character.className}</span> : null}
-                </button>
-              ))}
+          <section className="expedition-settings-characters" aria-labelledby="expedition-characters-title">
+            <div className="expedition-settings-section-heading">
+              <h3 id="expedition-characters-title">캐릭터 관리</h3>
+              <span>{expedition.characters.length}명</span>
             </div>
-          ) : null}
-          {!restorableCharacters.length ? (
-            <p className="expedition-restore-hint">추가할 수 있는 삭제된 캐릭터가 없습니다. 새 캐릭터는 멤버 목록에서 동기화할 수 있습니다.</p>
-          ) : null}
-        </section>
+            {expedition.characters.length ? (
+              <ul>
+                {expedition.characters.map((character) => (
+                  <li key={character.id}>
+                    <div>
+                      <strong>{character.name || "캐릭터"}</strong>
+                      <span>{character.className || "직업 없음"} · Lv. {formatItemLevel(character.itemLevel)}</span>
+                    </div>
+                    <button
+                      className="danger-text-button"
+                      type="button"
+                      aria-label={`${character.name || "캐릭터"} 삭제`}
+                      onClick={() => onRemoveCharacter(player.id, expedition.id, character.id)}
+                    >
+                      삭제
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="expedition-settings-empty">등록된 캐릭터가 없습니다.</p>}
+            <div
+              className={`expedition-restore-control${restorableCharacters.length ? "" : " is-disabled"}`}
+              role="group"
+              tabIndex={restorableCharacters.length ? undefined : 0}
+              aria-describedby={restorableCharacters.length ? undefined : `expedition-restore-tooltip-${expedition.id}`}
+            >
+              <button
+                className="add-raid-button expedition-restore-button"
+                type="button"
+                aria-expanded={restoreOpen}
+                onClick={() => setRestoreOpen((current) => !current)}
+                disabled={!restorableCharacters.length}
+              >
+                <CoolIcon name="add" /> 캐릭터 추가
+              </button>
+              {!restorableCharacters.length ? (
+                <span
+                  className="expedition-restore-tooltip"
+                  id={`expedition-restore-tooltip-${expedition.id}`}
+                  role="tooltip"
+                >
+                  삭제된 캐릭터가 없습니다.<br />새 캐릭터는 멤버 목록에서 동기화할 수 있습니다.
+                </span>
+              ) : null}
+            </div>
+            {restoreOpen && restorableCharacters.length ? (
+              <div className="expedition-restore-list">
+                {restorableCharacters.map((character) => (
+                  <button
+                    key={character.name}
+                    type="button"
+                    onClick={() => {
+                      onRestoreCharacter(player.id, expedition.id, character.name);
+                      setRestoreOpen(false);
+                    }}
+                  >
+                    <strong>{character.name}</strong>
+                    {character.className ? <span>{character.className}</span> : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </section>
+
+          <section className="expedition-delete-zone" aria-labelledby="expedition-delete-title">
+            <div>
+              <h3 id="expedition-delete-title">원정대 삭제</h3>
+              <p>이 원정대와 관련된 모든 설정이 삭제됩니다.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onRemoveExpedition(player.id, expedition.id)}
+            >
+              원정대 삭제
+            </button>
+          </section>
+        </div>
 
         <div className="settings-modal-actions expedition-settings-actions">
-          <button
-            className="danger-text-button"
-            type="button"
-            onClick={() => onRemoveExpedition(player.id, expedition.id)}
-          >
-            <CoolIcon name="trash" /> 원정대 삭제
-          </button>
-          <button
-            className="dark-button"
-            type="submit"
-          >
-            완료
-          </button>
+          <button className="ghost-button" type="button" onClick={onClose}>취소</button>
+          <button className="dark-button" type="submit">완료</button>
         </div>
       </form>
     </div>
@@ -2734,6 +2766,8 @@ function IntegratedCharacterCard({
   const raidPopoverButtonRef = useRef<HTMLButtonElement>(null);
   const raidPopoverId = `raid-popover-${character.id}`;
   const supportCapable = isSupportClass(character.className);
+  const nextRole = character.role === "support" ? "dealer" : "support";
+  const roleTooltip = character.role === "support" ? "딜러로 전환" : "서폿으로 전환";
   const recommendedRaids = new Set(
     getGoldRecommendedRaidNames(character.selectedRaids, character.goldPreference),
   );
@@ -2785,27 +2819,32 @@ function IntegratedCharacterCard({
       <header className="integrated-character-head">
         <div className="integrated-character-identity">
           <div className="integrated-character-name-row">
-            <CoolIcon name={character.role === "support" ? "support" : "dealer"} />
-            <strong>{character.name || "캐릭터명"}</strong>
-          </div>
-          <div className="integrated-character-badge-row">
-            <span className="class-pill-text">{character.className || "직업 없음"}</span>
+            <span className="integrated-character-title">
+              <CoolIcon name={character.role === "support" ? "support" : "dealer"} />
+              <strong>{character.name || "캐릭터명"}</strong>
+            </span>
             {supportCapable ? (
               <button
-                className={`single-role-button ${character.role === "support" ? "support-option" : "dealer-option"}`}
+                className={`integrated-character-role-pill ${character.role}`}
                 type="button"
+                aria-label={`${character.className || "직업 없음"} · ${roleTooltip}`}
+                data-tooltip={roleTooltip}
                 onClick={() =>
                   onSetRole(
                     player.id,
                     expedition.id,
                     character.id,
-                    character.role === "support" ? "dealer" : "support",
+                    nextRole,
                   )
                 }
               >
-                {character.role === "support" ? "서폿" : "딜러"}
+                {character.className || "직업 없음"}
               </button>
-            ) : null}
+            ) : (
+              <span className={`integrated-character-role-pill ${character.role}`}>
+                {character.className || "직업 없음"}
+              </span>
+            )}
           </div>
         </div>
       </header>
