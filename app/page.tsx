@@ -1993,6 +1993,10 @@ function PlayerEditor({
     playerId: string;
     expeditionId: string;
   } | null>(null);
+  // Expedition collapse state is presentation-only and must not be shared through raid-group data.
+  const [collapsedExpeditionIds, setCollapsedExpeditionIds] = useState<Set<string>>(
+    new Set(),
+  );
   const displayedPlayers = useMemo(() => {
     const favorite = players.find((player) => player.id === favoritePlayerId);
     if (!favorite) return players;
@@ -2068,6 +2072,15 @@ function PlayerEditor({
     setActivePlayerId(nextPlayerId);
     requestAnimationFrame(() => {
       document.getElementById(`member-player-tab-${nextPlayerId}`)?.focus();
+    });
+  };
+
+  const toggleExpeditionCollapsed = (expeditionId: string) => {
+    setCollapsedExpeditionIds((current) => {
+      const next = new Set(current);
+      if (next.has(expeditionId)) next.delete(expeditionId);
+      else next.add(expeditionId);
+      return next;
     });
   };
 
@@ -2184,9 +2197,8 @@ function PlayerEditor({
                 onSetGoldPreference={onSetGoldPreference}
                 onSetCompletion={onSetCompletion}
                 onToggleRaid={onToggleRaid}
-                onToggleCollapsed={() => onUpdateExpedition(activePlayer.id, expedition.id, {
-                  charactersHidden: !expedition.charactersHidden,
-                })}
+                collapsed={collapsedExpeditionIds.has(expedition.id)}
+                onToggleCollapsed={() => toggleExpeditionCollapsed(expedition.id)}
                 onOpenSettings={() =>
                   setSettingsTarget({
                     playerId: activePlayer.id,
@@ -2285,6 +2297,7 @@ function ExpeditionBlock({
   onSetGoldPreference,
   onSetCompletion,
   onOpenSettings,
+  collapsed,
   onToggleCollapsed,
   onToggleRaid,
 }: {
@@ -2311,6 +2324,7 @@ function ExpeditionBlock({
     completed: boolean,
   ) => void;
   onOpenSettings: () => void;
+  collapsed: boolean;
   onToggleCollapsed: () => void;
   onToggleRaid: (
     playerId: string,
@@ -2320,17 +2334,17 @@ function ExpeditionBlock({
     checked: boolean,
   ) => void;
 }) {
-  const [contentUnclipped, setContentUnclipped] = useState(!expedition.charactersHidden);
+  const [contentUnclipped, setContentUnclipped] = useState(!collapsed);
   useEffect(() => {
     // Keep menus visible after opening, but clip the content during the slide.
-    const timer = window.setTimeout(() => setContentUnclipped(!expedition.charactersHidden),
-      expedition.charactersHidden ? 0 : 280);
+    const timer = window.setTimeout(() => setContentUnclipped(!collapsed),
+      collapsed ? 0 : 280);
     return () => window.clearTimeout(timer);
-  }, [expedition.charactersHidden]);
+  }, [collapsed]);
   const goldProgress = getExpeditionTradableGoldProgress(expedition, raidWeek);
 
   return (
-    <section className={`expedition-block${expedition.charactersHidden ? " is-collapsed" : ""}`}>
+    <section className={`expedition-block${collapsed ? " is-collapsed" : ""}`}>
       <div className="expedition-head">
         <div>
           <div className="expedition-title-line">
@@ -2370,8 +2384,8 @@ function ExpeditionBlock({
         <button
           className="expedition-disclosure-button"
           type="button"
-          aria-label={`${expedition.name} ${expedition.charactersHidden ? "펼치기" : "접기"}`}
-          aria-expanded={!expedition.charactersHidden}
+          aria-label={`${expedition.name} ${collapsed ? "펼치기" : "접기"}`}
+          aria-expanded={!collapsed}
           aria-controls={`expedition-body-${expedition.id}`}
           onClick={onToggleCollapsed}
         >
@@ -2381,11 +2395,11 @@ function ExpeditionBlock({
 
       <div
         id={`expedition-body-${expedition.id}`}
-        className={`expedition-collapsible ${expedition.charactersHidden ? "collapsed" : "expanded"}`}
-        aria-hidden={expedition.charactersHidden}
-        inert={expedition.charactersHidden}
+        className={`expedition-collapsible ${collapsed ? "collapsed" : "expanded"}`}
+        aria-hidden={collapsed}
+        inert={collapsed}
       >
-        <div className={`expedition-collapsible-content${contentUnclipped && !expedition.charactersHidden ? " unclipped" : ""}`}>
+        <div className={`expedition-collapsible-content${contentUnclipped && !collapsed ? " unclipped" : ""}`}>
           <div className="integrated-character-grid">
             {expedition.characters.map((character) => (
               <IntegratedCharacterCard
